@@ -1,1 +1,45 @@
-Bibles
+# Bibles; large files that we prefer not to have as a part of the repo, for various reasons.
+Bibles/
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+dist-electron/
+release/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/QUICKSTART.md
+!.vscode/SETUP.md
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug logs
+*.log
+
+# Temp
+tmp/
+temp/
+
+# Compiled types
+*.tsbuildinfo
