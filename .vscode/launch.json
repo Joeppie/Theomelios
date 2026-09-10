@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach Renderer",
+      "type": "pwa-chrome",
+      "request": "attach",
+      "port": 9229,
+      "webRoot": "${workspaceFolder}/src/renderer",
+      "sourceMaps": true,
+      "url": "http://localhost:5173/",
+      "pauseForSourceMap": true,
+      "serverReadyAction": {
+        "action": "openExternally"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Electron Debug (F5)",
+      "configurations": ["Attach Renderer"],
+      "preLaunchTask": "npm: electron:dev",
+      "serverReadyAction": {
+        "action": "debugWithChrome",
+        "pattern": "VITE READY|localhost:5173",
+        "uriFormat": "http://localhost:5173/"
+      }
+    }
+  ]
+}
