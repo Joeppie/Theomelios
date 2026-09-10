@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm: electron:dev",
+      "type": "npm",
+      "script": "electron:dev",
+      "isBackground": true,
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      },
+      "problemMatcher": {
+        "pattern": { "regexp": "^$", "file": 1, "location": 2 },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^vite",
+          "endsPattern": "^$"
+        }
+      }
+    }
+  ]
+}
