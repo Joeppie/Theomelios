@@ -1,8 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { app } from 'electron';
 import type { BibleData, BibleInfo, BookSummary, PassageResult, BibleVerse } from '../../schema/bible';
 
-const BIBLES_DIR = path.resolve(__dirname, '..', '..', 'Bibles');
+function resolveBiblesDir(): string {
+  return path.join(app.getAppPath(), 'Bibles');
+}
+
+const BIBLES_DIR = resolveBiblesDir();
 
 const allBookNames: { [key: string]: string } = {
   Gn: 'Genesis', Gen: 'Genesis',
