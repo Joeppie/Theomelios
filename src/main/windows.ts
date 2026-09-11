@@ -3,6 +3,7 @@ import path from 'node:path';
 import { listTranslations, getTranslationInfo, getVerses } from '../domain/bible/bibleLoader';
 
 let mainWin: BrowserWindow | null = null;
+let presentationWin: BrowserWindow | null = null;
 
 export function createMainWindow() {
   if (mainWin) {
@@ -37,11 +38,21 @@ export function createMainWindow() {
   });
 }
 
+let pendingPresentationData: any = null;
+
 export function createPresentationWindow() {
   const existingWins = BrowserWindow.getAllWindows();
   for (const win of existingWins) {
-    if (win !== mainWin && !win.isDestroyed()) {
+    if (win === presentationWin && !win.isDestroyed()) {
       win.focus();
+      if (pendingPresentationData) {
+        setTimeout(() => {
+          if (win && !win.isDestroyed() && win.webContents.isDOMReady()) {
+            win.webContents.send('passage:update', pendingPresentationData);
+            pendingPresentationData = null;
+          }
+        }, 50);
+      }
       return win;
     }
   }
@@ -67,13 +78,28 @@ export function createPresentationWindow() {
     });
   }
 
+  win.once('did-finish-load', () => {
+    if (pendingPresentationData && !win.isDestroyed()) {
+      win.webContents.send('passage:update', pendingPresentationData);
+      pendingPresentationData = null;
+    }
+  });
+
   win.on('closed', () => {
+    if (presentationWin === win) {
+      presentationWin = null;
+    }
     if (mainWin) {
       mainWin.webContents.send('window:closed');
     }
   });
 
+  presentationWin = win;
   return win;
+}
+
+export function setPendingPresentationData(data: any) {
+  pendingPresentationData = data;
 }
 
 export function getMainWin() {
