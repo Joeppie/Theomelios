@@ -1,57 +1,32 @@
 {
-  "name": "bible-researcher",
-  "version": "1.0.0",
-  "description": "Desktop Bible research and presentation application",
-  "main": "dist-electron/main.js",
+  "name": "theomelios",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc && vite build",
     "preview": "vite preview",
-    "electron:dev": "NODE_ENV=development vite --mode electron",
-    "electron:debug": "node scripts/debug-launch.js",
-    "electron:build": "tsc && vite build && electron-builder",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "oxlint .",
     "typecheck": "tsc --noEmit"
   },
-  "build": {
-    "appId": "com.theomelios.bible-researcher",
-    "productName": "Bible Researcher",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*",
-      "Bibles/**/*"
-    ],
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg"
-    },
-    "linux": {
-      "target": "AppImage"
-    }
-  },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "reveal.js": "^5.1.0"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/react": "^18.2.45",
-    "@types/react-dom": "^18.2.18",
-    "@vitejs/plugin-react": "^4.2.1",
-    "electron": "^28.3.3",
-    "electron-builder": "^24.9.1",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.8",
-    "vite-plugin-electron": "^0.28.0",
-    "vite-plugin-electron-renderer": "^0.14.1"
+    "@types/node": "^26.5.1",
+    "@types/react": "^19.1.5",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.1",
+    "oxlint": "^0.16.0",
+    "typescript": "~5.7.3",
+    "vite": "^6.2.0",
+    "vitest": "^3.1.4"
   },
   "allowScripts": {
-    "electron@28.3.3": true,
-    "esbuild@0.21.5": true
+    "esbuild@0.25.12": true
   }
 }
