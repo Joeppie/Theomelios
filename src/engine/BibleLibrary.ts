@@ -1,4 +1,4 @@
-import type { BibleData, BibleMetadata } from '../types/bible'
+import type { BibleData } from '../types/bible'
 import { SearchIndex } from './search'
 
 export class BibleLibrary {

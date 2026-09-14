@@ -1,0 +1,31 @@
+export const bookOrder: Record<string, number> = {
+  'Gn': 1, 'Ex': 2, 'Lv': 3, 'Nu': 4, 'Dt': 5, 'Jos': 6, 'Jdg': 7, 'Ru': 8,
+  '1Sa': 9, '2Sa': 10, '1Ki': 11, '2Ki': 12, '1Ch': 13, '2Ch': 14, 'Ezr': 15,
+  'Ne': 16, 'Est': 17, 'Job': 18, 'Ps': 19, 'Pr': 20, 'Ec': 21, 'So': 22,
+  'Is': 23, 'Je': 24, 'La': 25, 'Ez': 26, 'Dn': 27, 'Ho': 28, 'Jl': 29,
+  'Am': 30, 'Ob': 31, 'Jon': 32, 'Mi': 33, 'Na': 34, 'Hab': 35, 'Zp': 36,
+  'Hg': 37, 'Zc': 38, 'Mal': 39, 'Mt': 40, 'Mr': 41, 'Lu': 42, 'Jn': 43,
+  'Ac': 44, 'Ro': 45, '1Co': 46, '2Co': 47, 'Ga': 48, 'Eph': 49, 'Ph': 50,
+  'Col': 51, '1Th': 52, '2Th': 53, '1Ti': 54, '2Ti': 55, 'Ti': 56, 'Phm': 57,
+  'He': 58, 'Ja': 59, '1Pe': 60, '2Pe': 61, '1Jn': 62, '2Jn': 63, '3Jn': 64,
+  'Ju': 65, 'Re': 66,
+}
+
+export const bookNameMap: Record<string, string> = {
+  'Gn': 'Genesis', 'Ex': 'Exodus', 'Lv': 'Leviticus', 'Nu': 'Numbers', 'Dt': 'Deuteronomy',
+  'Jos': 'Joshua', 'Jdg': 'Judges', 'Ru': 'Ruth', '1Sa': '1 Samuel', '2Sa': '2 Samuel',
+  '1Ki': '1 Kings', '2Ki': '2 Kings', '1Ch': '1 Chronicles', '2Ch': '2 Chronicles',
+  'Ezr': 'Ezra', 'Ne': 'Nehemiah', 'Est': 'Esther', 'Job': 'Job', 'Ps': 'Psalms',
+  'Pr': 'Proverbs', 'Ec': 'Ecclesiastes', 'So': 'Song of Solomon',
+  'Is': 'Isaiah', 'Je': 'Jeremiah', 'La': 'Lamentations', 'Ez': 'Ezekiel',
+  'Dn': 'Daniel', 'Ho': 'Hosea', 'Jl': 'Joel', 'Am': 'Amos', 'Ob': 'Obadiah',
+  'Jon': 'Jonah', 'Mi': 'Micah', 'Na': 'Nahum', 'Hab': 'Habakkuk', 'Zp': 'Zephaniah',
+  'Hg': 'Haggai', 'Zc': 'Zechariah', 'Mal': 'Malachi',
+  'Mt': 'Matthew', 'Mr': 'Mark', 'Lu': 'Luke', 'Jn': 'John', 'Ac': 'Acts',
+  'Ro': 'Romans', '1Co': '1 Corinthians', '2Co': '2 Corinthians',
+  'Ga': 'Galatians', 'Eph': 'Ephesians', 'Ph': 'Philippians', 'Col': 'Colossians',
+  '1Th': '1 Thessalonians', '2Th': '2 Thessalonians', '1Ti': '1 Timothy',
+  '2Ti': '2 Timothy', 'Ti': 'Titus', 'Phm': 'Philemon', 'He': 'Hebrews',
+  'Ja': 'James', '1Pe': '1 Peter', '2Pe': '2 Peter', '1Jn': '1 John', '2Jn': '2 John',
+  '3Jn': '3 John', 'Ju': 'Jude', 'Re': 'Revelation',
+}

@@ -69,16 +69,13 @@ export function shouldIgnoreWord(word: string): boolean {
   return false
 }
 
-function stemCount(stems: string[], stem: string): number {
-  return stems.filter(s => s === stem).length
-}
-
 export class SearchIndex {
   private index = new Map<string, Set<string>>()
   private docs = new Map<string, SearchDocument>()
   private versionBibleNames = new Map<string, string>()
   private bibleDocKeys = new Map<string, Set<string>>()
   private docToStems = new Map<string, string[]>()
+  private docToPositions = new Map<string, number[]>()
 
   private docKey(doc: SearchDocument): string {
     return `${doc.bibleId}|${doc.testamentId}|${doc.bookId}|${doc.chapterId}|${doc.verseId}`
@@ -96,7 +93,9 @@ export class SearchIndex {
 
     const tokens = tokenize(doc.text)
     const stemKeys: string[] = []
-    for (const token of tokens) {
+    const positions: number[] = []
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i]
       if (shouldIgnoreWord(token)) continue
       const stem = simpleStem(token)
       if (!this.index.has(stem)) {
@@ -104,8 +103,10 @@ export class SearchIndex {
       }
       this.index.get(stem)!.add(key)
       stemKeys.push(stem)
+      positions.push(i)
     }
     this.docToStems.set(key, stemKeys)
+    this.docToPositions.set(key, positions)
   }
 
   indexBible(bible: BibleData): void {
@@ -166,39 +167,58 @@ export class SearchIndex {
 
     for (const key of allKeys) {
       const docStems = this.docToStems.get(key)
-      if (!docStems) continue
+      const docPositions = this.docToPositions.get(key)
+      if (!docStems || !docPositions) continue
 
       const matchingTerms = new Set<string>()
       let score = 0
+      let positionBonus = 0
 
-      for (const stem of stems) {
+      // Track the last position we saw for ordering bonus
+      let lastPosition = -1
+
+      for (const [stemIdx, stem] of stems.entries()) {
         const stemSet = stemMatches.get(stem)
         if (!stemSet || !stemSet.has(key)) continue
 
         matchingTerms.add(stem)
 
-        // Count how many times this stem appears in the document
-        const docFreq = stemCount(docStems, stem)
-        // Frequency in corpus (inverse document frequency style)
-        const corpusFreq = stemFreq.get(stem) || 1
+        // Position weight: earlier terms in query weigh more
+        const positionWeight = 1 / (stemIdx + 1)
 
-        score += docFreq * (Math.log(1000 / corpusFreq) + 1)
+        // IDF: always positive, higher for rarer terms
+        const corpusFreq = stemFreq.get(stem) || 1
+        const idf = Math.log(1 + (10000 / (corpusFreq + 1)))
+
+        score += positionWeight * idf
+
+        // Check if this stem appears after the last matched stem in the verse
+        const stemPositions = docPositions.filter(p => docStems[p] === stem)
+        if (stemPositions.length > 0) {
+          const firstOccurrence = Math.min(...stemPositions)
+          if (firstOccurrence > lastPosition) {
+            // Stem appears after previous match in query order
+            positionBonus += 0.5
+          } else {
+            // Stem appears out of order - significant penalty
+            positionBonus -= 0.25
+          }
+          lastPosition = firstOccurrence
+        }
       }
 
       if (matchingTerms.size === 0) continue
 
-      // Boost for matching more terms
-      score *= (matchingTerms.size / stems.length)
+      // Partial match penalty: divide by total query terms
+      score /= stems.length
+
+      // Add position bonus
+      score += positionBonus
 
       ranked.push({ key, score, matchingTerms })
     }
 
-    ranked.sort((a, b) => {
-      if (b.matchingTerms.size !== a.matchingTerms.size) {
-        return b.matchingTerms.size - a.matchingTerms.size
-      }
-      return b.score - a.score
-    })
+    ranked.sort((a, b) => b.score - a.score)
 
     // Map stem -> token
     const stemToToken = new Map<string, string>()
@@ -274,6 +294,7 @@ export class SearchIndex {
           }
         }
         this.docToStems.delete(key)
+        this.docToPositions.delete(key)
       }
       this.bibleDocKeys.delete(bibleId)
     }
