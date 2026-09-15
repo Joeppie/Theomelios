@@ -16,6 +16,41 @@ describe('normalizeBookAbbreviation', () => {
   it('returns original if not found in book map', () => {
     expect(normalizeBookAbbreviation('Unknown')).toBe('Unknown')
   })
+
+  it('normalizes Ezekiel alternate abbreviations to Ez', () => {
+    expect(normalizeBookAbbreviation('Eze')).toBe('Ez')
+    expect(normalizeBookAbbreviation('Ezek')).toBe('Ez')
+    expect(normalizeBookAbbreviation('Ezekiel')).toBe('Ez')
+    expect(normalizeBookAbbreviation('Ezek.')).toBe('Ez')
+  })
+
+  it('normalizes 1 & 2 Chronicles alternate abbreviations', () => {
+    expect(normalizeBookAbbreviation('1Chr')).toBe('1Ch')
+    expect(normalizeBookAbbreviation('2Chr')).toBe('2Ch')
+  })
+
+  it('normalizes Genesis, Numbers, Deuteronomy alternates', () => {
+    expect(normalizeBookAbbreviation('Gen')).toBe('Gn')
+    expect(normalizeBookAbbreviation('Num')).toBe('Nu')
+    expect(normalizeBookAbbreviation('Nm')).toBe('Nu')
+    expect(normalizeBookAbbreviation('Deut')).toBe('Dt')
+  })
+
+  it('normalizes New Testament alternate abbreviations', () => {
+    expect(normalizeBookAbbreviation('Matt')).toBe('Mt')
+    expect(normalizeBookAbbreviation('Mk')).toBe('Mr')
+    expect(normalizeBookAbbreviation('Lk')).toBe('Lu')
+    expect(normalizeBookAbbreviation('Acts')).toBe('Ac')
+    expect(normalizeBookAbbreviation('Rom')).toBe('Ro')
+    expect(normalizeBookAbbreviation('Rev')).toBe('Re')
+  })
+
+  it('normalizes Jeremiah and other OT books', () => {
+    expect(normalizeBookAbbreviation('Jer')).toBe('Je')
+    expect(normalizeBookAbbreviation('Dan')).toBe('Dn')
+    expect(normalizeBookAbbreviation('Dani')).toBe('Dn')
+    expect(normalizeBookAbbreviation('Lam')).toBe('La')
+  })
 })
 
 describe('createMetadata', () => {

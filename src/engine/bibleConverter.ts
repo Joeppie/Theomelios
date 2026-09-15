@@ -1,9 +1,10 @@
 import { BibleData, BibleMetadata, BookData, ChapterData, TestamentData, VerseEntry } from '../types/bible'
-import { bookNameMap } from '../constants/books'
+import { bookNameMap, alternateBookAbbreviations } from '../constants/books'
 
 export function normalizeBookAbbreviation(abbr: string): string {
   if (bookNameMap[abbr]) return abbr
   const cleaned = abbr.replace(/[^a-zA-Z0-9]/g, '')
+  if (alternateBookAbbreviations[cleaned]) return alternateBookAbbreviations[cleaned]
   if (bookNameMap[cleaned]) return cleaned
   return abbr
 }

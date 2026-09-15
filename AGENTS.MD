@@ -10,6 +10,9 @@ make the secondary display a real Electron BrowserWindow
 use reveal.js for presentation mechanics
 keep components small and composable
 make Bible translations data-driven
+ensure domain logic is testable without UI — core functionality (parsing, indexing, searching, reference resolution, conversion) must live in pure or easily mockable modules with dedicated tests
+avoid redundancy — share logic, deduplicate selectors, extract repeated patterns into utilities; prefer a single source of truth for any piece of data or behavior
+document tech debt — when a shortcut or workaround is necessary, add a clear TODO/MAGIC comment in-code with context (why, impact, and how to fix). Also note it here in AGENTS.MD under "Tech Debt" so it is tracked across sessions
 
 Don't:
 
@@ -23,6 +26,8 @@ build the presentation editor in the first milestone
 build authentication/cloud sync
 hardcode KJV-specific assumptions into the UI
 create a complicated plugin architecture prematurely
+implement logic directly in UI components when it belongs in the engine layer
+write duplicated logic — if you find yourself copying a pattern more than twice, extract it
 
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -89,3 +94,10 @@ The key architectural objective is that the first version proves the presentatio
                   
                   
 Once that pipeline works, search, passage ranges, presentation queues, notes, service plans, cross-references, keyboard control, and richer presenter controls can all be layered onto it without changing the fundamental architecture.
+
+
+## Tech Debt
+
+Track here any shortcuts, workarounds, or known issues encountered during development. Resolve or remove entries once addressed.
+
+- _(none yet)_
