@@ -109,10 +109,10 @@ export const alternateBookAbbreviations: Record<string, string> = {
   'Eze': 'Ez', 'Ezek': 'Ez', 'Ezekiel': 'Ez',
   // 1 & 2 Chronicles variants
   '1Chr': '1Ch', '2Chr': '2Ch', '1Chronicles': '1Ch', '2Chronicles': '2Ch',
-  // 1 & 2 Samuel variants
-  '1Sm': '1Sa', '2Sm': '2Sa',
-  // 1 & 2 Kings variants
-  '1Kg': '1Ki', '2Kg': '2Ki',
+  // 1 & 2 Samuel variants (all forms)
+  '1Sm': '1Sa', '2Sm': '2Sa', '1S': '1Sa', '2S': '2Sa', '1Sa': '1Sa', '2Sa': '2Sa',
+  // 1 & 2 Kings variants (all forms)
+  '1Kg': '1Ki', '2Kg': '2Ki', '1K': '1Ki', '2K': '2Ki', '1Ki': '1Ki', '2Ki': '2Ki',
   // Old Testament extra variants
   'Gen': 'Gn', 'Genesis': 'Gn',
   'Exod': 'Ex', 'Exodus': 'Ex',
@@ -120,14 +120,14 @@ export const alternateBookAbbreviations: Record<string, string> = {
   'Num': 'Nu', 'Nm': 'Nu', 'Nb': 'Nu', 'Numbers': 'Nu',
   'Deut': 'Dt', 'Dtn': 'Dt', 'Deuteronomy': 'Dt',
   'Josh': 'Jos', 'Jsh': 'Jos', 'Joshua': 'Jos',
-  'Jdgs': 'Jdg', 'Judges': 'Jdg',
-  'Rth': 'Ru', 'Ruth': 'Ru',
+  'Jdgs': 'Jdg', 'Judges': 'Jdg', 'Jg': 'Jdg',
+  'Rth': 'Ru', 'Rt': 'Ru', 'Ruth': 'Ru',
   'Psm': 'Ps', 'Psalms': 'Ps',
   'Prv': 'Pr', 'Prov': 'Pr', 'Proverbs': 'Pr',
   'Eccl': 'Ec', 'Eccles': 'Ec', 'Ecclesiastes': 'Ec',
   'Isa': 'Is', 'Isaiah': 'Is',
-  'Jer': 'Je', 'Jeremiah': 'Je',
-  'Lam': 'La', 'Lamentations': 'La',
+  'Jer': 'Je', 'Jeremiah': 'Je', 'Jr': 'Je',
+  'La': 'La', 'Lam': 'La', 'Lamentations': 'La',
   'Dan': 'Dn', 'Daniel': 'Dn', 'Dani': 'Dn',
   'Hos': 'Ho', 'Hosea': 'Ho',
   'Joe': 'Jl', 'Joel': 'Jl',
@@ -137,28 +137,32 @@ export const alternateBookAbbreviations: Record<string, string> = {
   'Hab': 'Hab', 'Habakkuk': 'Hab',
   'Zeph': 'Zp', 'Zephaniah': 'Zp',
   'Zech': 'Zc', 'Zechariah': 'Zc',
-  'Malachi': 'Mal',
+  'Mal': 'Mal', 'Ml': 'Mal', 'Malachi': 'Mal',
+  'Est': 'Est', 'Es': 'Est', 'Esther': 'Est',
+  'Job': 'Job', 'Jb': 'Job',
+  'Mi': 'Mi', 'Mic': 'Mi', 'Micah': 'Mi',
   // New Testament extra variants
   'Matt': 'Mt', 'Matthew': 'Mt',
   'Mk': 'Mr', 'Mc': 'Mr', 'Mark': 'Mr',
   'Lk': 'Lu', 'Luk': 'Lu', 'Luke': 'Lu',
   'Acts': 'Ac',
-  'Rom': 'Ro', 'Romans': 'Ro',
+  'Rom': 'Ro', 'Romans': 'Ro', 'Rm': 'Ro',
   '1Cor': '1Co', '1Co': '1Co',
   '2Cor': '2Co', '2Co': '2Co',
-  'Gal': 'Ga', 'Galatians': 'Ga',
-  'Ephesians': 'Eph',
-  'Php': 'Ph', 'Phil': 'Ph', 'Philippians': 'Ph',
-  'Colossians': 'Col',
+  'Ga': 'Ga', 'Gal': 'Ga', 'Galatians': 'Ga',
+  'Eph': 'Eph', 'Ephesians': 'Eph',
+  'Php': 'Ph', 'Phil': 'Ph', 'Ph': 'Ph', 'Philippians': 'Ph',
+  'Col': 'Col', 'Colossians': 'Col',
   '1Thes': '1Th', '2Thes': '2Th',
   '1Tim': '1Ti', '2Tim': '2Ti', '1Timothy': '1Ti', '2Timothy': '2Ti',
-  'Titus': 'Ti',
-  'Philem': 'Phm', 'Philemon': 'Phm',
+  'Ti': 'Ti', 'Tit': 'Ti', 'Titus': 'Ti',
+  'Phm': 'Phm', 'Philem': 'Phm', 'Philemon': 'Phm',
   'Heb': 'He', 'Hebrews': 'He',
-  'James': 'Ja', 'Jas': 'Ja',
+  'Ja': 'Ja', 'James': 'Ja', 'Jas': 'Ja', 'Jm': 'Ja',
   '1Pet': '1Pe', '2Pet': '2Pe',
+  '1Pt': '1Pe', '2Pt': '2Pe',
   '1Joh': '1Jn', '2Joh': '2Jn', '3Joh': '3Jn',
-  'Jude': 'Ju',
+  'Jude': 'Ju', 'Jud': 'Ju',
   'Rev': 'Re', 'Revelation': 'Re',
   'Apocalypse': 'Re',
 }
@@ -166,6 +170,83 @@ export const alternateBookAbbreviations: Record<string, string> = {
 export const bookNameToAbbr: Record<string, string> = {}
 for (const [abbr, name] of Object.entries(bookNameMap)) {
   bookNameToAbbr[name] = abbr
+}
+
+export type BookCategory = {
+  id: string
+  name: string
+  color: string
+  books: string[]
+}
+
+export const bookCategories: BookCategory[] = [
+  {
+    id: 'pentateuch',
+    name: 'Pentateuch',
+    color: '#e74c3c',
+    books: ['Gn', 'Ex', 'Lv', 'Nu', 'Dt'],
+  },
+  {
+    id: 'historical_ot',
+    name: 'Historical Books',
+    color: '#e67e22',
+    books: ['Jos', 'Jdg', 'Ru', '1Sa', '2Sa', '1Ki', '2Ki', '1Ch', '2Ch', 'Ezr', 'Ne', 'Est'],
+  },
+  {
+    id: 'poetry_wisdom',
+    name: 'Poetry & Wisdom',
+    color: '#9b59b6',
+    books: ['Job', 'Ps', 'Pr', 'Ec', 'So'],
+  },
+  {
+    id: 'major_prophets',
+    name: 'Major Prophets',
+    color: '#3498db',
+    books: ['Is', 'Je', 'La', 'Ez', 'Dn'],
+  },
+  {
+    id: 'minor_prophets',
+    name: 'Minor Prophets',
+    color: '#2ecc71',
+    books: ['Ho', 'Jl', 'Am', 'Ob', 'Jon', 'Mi', 'Na', 'Hab', 'Zp', 'Hg', 'Zc', 'Mal'],
+  },
+  {
+    id: 'gospels',
+    name: 'Gospels',
+    color: '#1abc9c',
+    books: ['Mt', 'Mr', 'Lu', 'Jn'],
+  },
+  {
+    id: 'church',
+    name: 'Church',
+    color: '#f39c12',
+    books: ['Ac'],
+  },
+  {
+    id: 'pauline_epistles',
+    name: 'Pauline Epistles',
+    color: '#e74c3c',
+    books: ['Ro', '1Co', '2Co', 'Ga', 'Eph', 'Ph', 'Col', '1Th', '2Th', '1Ti', '2Ti', 'Ti', 'Phm'],
+  },
+  {
+    id: 'general_epistles',
+    name: 'General Epistles',
+    color: '#9b59b6',
+    books: ['He', 'Ja', '1Pe', '2Pe', '1Jn', '2Jn', '3Jn', 'Ju'],
+  },
+  {
+    id: 'prophecy',
+    name: 'Prophecy',
+    color: '#2ecc71',
+    books: ['Re'],
+  },
+]
+
+export const bookCategoryMap: Record<string, BookCategory> = {}
+for (const cat of bookCategories) {
+  for (const abbr of cat.books) {
+    bookCategoryMap[abbr] = cat
+  }
 }
 
 export function findBookByPattern(input: string): string | null {

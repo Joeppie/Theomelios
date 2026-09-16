@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { BibleLibrary } from '../engine/BibleLibrary'
 import { parseVpcJson } from '../engine/vpcParser'
 import { convertVpcToUniform } from '../engine/bibleConverter'
-import { parseReference, findBookByPattern, bookNameToAbbr, findBookByName } from '../constants/books'
+import { loadBibleFromZipFile } from '../engine/zipLoader'
+import { parseReference, findBookByPattern, bookNameToAbbr, findBookByName, bookCategories, bookCategoryMap } from '../constants/books'
 import type { SelectorBook, SelectorChapter, SelectorVerse } from '../types/bible'
 
 // Range helpers for verse selections
@@ -147,11 +148,19 @@ function App() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        if (!file.name.endsWith('.vpc.json')) continue
-        const content = await file.text()
-        const raw = parseVpcJson(content)
-        const bible = convertVpcToUniform(raw, file.name.replace('.vpc.json', ''))
-        library.loadBible(bible)
+        if (file.name.endsWith('.zip')) {
+          const results = await loadBibleFromZipFile(file)
+          for (const { bible } of results) {
+            library.loadBible(bible)
+          }
+        } else if (file.name.endsWith('.vpc.json')) {
+          const content = await file.text()
+          const raw = parseVpcJson(content)
+          const bible = convertVpcToUniform(raw, file.name.replace('.vpc.json', ''))
+          library.loadBible(bible)
+        } else {
+          continue
+        }
       }
       setBibleCount(library.getBibleCount())
       setDocCount(library.getDocumentCount())
@@ -427,7 +436,7 @@ function App() {
         <input
           type="file"
           multiple
-          accept=".vpc.json,.json"
+          accept=".vpc.json,.json,.zip"
           onChange={handleFileSelect}
           style={{ fontSize: '0.85rem' }}
         />
@@ -482,29 +491,58 @@ function App() {
 
       <div style={{ flex: 1, display: 'flex', gap: '8px', minHeight: 0, overflow: 'hidden' }}>
         {/* Books Pane */}
-        <div style={{ flex: '0 0 140px', display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
+        <div style={{ flex: '0 0 220px', display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
           <div style={{ padding: '0.5rem', background: '#f0f0f0', borderBottom: '1px solid #ddd', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Books
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0.25rem' }}>
-            {books.map(book => (
-              <div
-                key={book.abbreviation}
-                onClick={() => handleBookSelect(book.abbreviation)}
-                onMouseDown={handleContainerMouseDown}
-                style={{
-                  padding: '0.35rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem',
-                  background: selectedBook === book.abbreviation ? '#0066cc' : 'transparent',
-                  color: selectedBook === book.abbreviation ? 'white' : '#333',
-                  borderRadius: '3px', marginBottom: '1px',
-                  borderLeft: selectedBook === book.abbreviation ? '3px solid #004499' : '3px solid transparent',
-                }}
-                title={book.name}
-              >
-                {book.abbreviation}
-              </div>
-            ))}
-            {books.length === 0 && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0.35rem' }}>
+            {books.length > 0 ? bookCategories.map(category => {
+              const visibleBooks = category.books.filter(abbr => books.some(b => b.abbreviation === abbr))
+              if (visibleBooks.length === 0) return null
+              return (
+                <div key={category.id} style={{ marginBottom: '0.35rem' }}>
+                  <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: category.color, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px', paddingLeft: '1px' }}>
+                    {category.name}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
+                    {visibleBooks.map(abbr => {
+                      const book = books.find(b => b.abbreviation === abbr)
+                      const isSelected = selectedBook === abbr
+                      const cat = bookCategoryMap[abbr]
+                      return (
+                        <div
+                          key={abbr}
+                          onClick={() => handleBookSelect(abbr)}
+                          onMouseDown={handleContainerMouseDown}
+                          title={book?.name || abbr}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '0.55rem',
+                            fontWeight: 'bold',
+                            fontFamily: 'monospace',
+                            borderRadius: '2px',
+                            background: isSelected
+                              ? cat?.color || '#0066cc'
+                              : (cat?.color || '#999') + 'cc',
+                            color: isSelected ? 'white' : 'white',
+                            border: isSelected ? `2px solid ${cat?.color || '#0066cc'}` : `2px solid ${cat?.color || '#999'}`,
+                            transition: 'transform 0.08s',
+                            transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+                          }}
+                        >
+                          {abbr}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            }) : (
               <div style={{ padding: '0.5rem', fontSize: '0.75rem', color: '#999', textAlign: 'center' }}>
                 {selectedBibleId ? 'No books' : 'No Bible loaded'}
               </div>
@@ -513,31 +551,45 @@ function App() {
         </div>
 
         {/* Chapters Pane */}
-        <div style={{ flex: '0 0 110px', display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
+        <div style={{ flex: '0 0 165px', display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
           <div style={{ padding: '0.5rem', background: '#f0f0f0', borderBottom: '1px solid #ddd', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Chapters
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0.25rem', userSelect: 'none' }}>
-            {chapters.map((chapter) => {
-              const isSelected = selectedChapter === chapter.id
-              return (
-                <div
-                  key={chapter.id}
-                  onClick={() => handleChapterSelect(chapter.id)}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    padding: '0.35rem 0.5rem', cursor: 'pointer', fontSize: '0.8rem',
-                    background: isSelected ? '#0066cc' : 'transparent',
-                    color: isSelected ? 'white' : '#333',
-                    borderRadius: '3px', marginBottom: '1px',
-                    borderLeft: isSelected ? '3px solid #004499' : '3px solid transparent',
-                  }}
-                >
-                  {chapter.id}
-                </div>
-              )
-            })}
-            {chapters.length === 0 && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0.35rem', userSelect: 'none' }}>
+            {chapters.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                {chapters.map((chapter) => {
+                  const isSelected = selectedChapter === chapter.id
+                  return (
+                    <div
+                      key={chapter.id}
+                      onClick={() => handleChapterSelect(chapter.id)}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      title={`Chapter ${chapter.id}`}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        fontFamily: 'monospace',
+                        borderRadius: '2px',
+                        background: isSelected ? '#0066cc' : '#555',
+                        color: isSelected ? 'white' : 'white',
+                        border: isSelected ? '2px solid #004499' : '2px solid #333',
+                        transition: 'transform 0.08s',
+                        transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+                      }}
+                    >
+                      {chapter.id}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
               <div style={{ padding: '0.5rem', fontSize: '0.75rem', color: '#999', textAlign: 'center' }}>
                 {selectedBook ? 'No chapters' : 'Select a book'}
               </div>
