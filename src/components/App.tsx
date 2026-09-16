@@ -3,8 +3,20 @@ import { BibleLibrary } from '../engine/BibleLibrary'
 import { parseVpcJson } from '../engine/vpcParser'
 import { convertVpcToUniform } from '../engine/bibleConverter'
 import { loadBibleFromZipFile } from '../engine/zipLoader'
-import { parseReference, findBookByPattern, bookNameToAbbr, findBookByName, bookCategories, bookCategoryMap } from '../constants/books'
+import { parseReference, findBookByName, bookNameToAbbr, findBookByPattern } from '../constants/books'
 import type { SelectorBook, SelectorChapter, SelectorVerse } from '../types/ui'
+
+// Component imports
+import { Header } from './Header'
+import { StatusInfo } from './StatusInfo'
+import { FileUploader } from './FileUploader'
+import { SearchBar } from './SearchBar'
+import { SelectionSummary } from './SelectionSummary'
+import { ResultsSummary } from './ResultsSummary'
+import { BooksPane } from './BooksPane'
+import { ChaptersPane } from './ChaptersPane'
+import { VersesPane } from './VersesPane'
+import { ResultsPane } from './ResultsPane'
 
 // Range helpers for verse selections
 function addVerseRange(ranges: [number, number][], verseId: number): [number, number][] {
@@ -49,23 +61,33 @@ function collapseRangesForMap(selections: Map<string, [number, number][]>): Map<
   return next
 }
 
-function truncateText(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text
-  return text.substring(0, maxLen) + '\u2026'
-}
-
+/**
+ * App — top-level application component.
+ * Manages state for Bible library, selection, search, and navigation.
+ * Composes smaller components for header, file upload, search, book/chapter/verse panes, and results.
+ */
 function App() {
+  // Bible library instance (persistent across renders)
   const [library] = useState(() => new BibleLibrary())
+
+  // Search state
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<any[]>([])
+
+  // Library state
   const [bibleCount, setBibleCount] = useState(0)
   const [docCount, setDocCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Mode toggle (select vs search)
   const [mode, setMode] = useState<'select' | 'search'>('select')
+
+  // Bible selection
   const [bibleNames, setBibleNames] = useState<{ id: string; name: string }[]>([])
   const [selectedBibleId, setSelectedBibleId] = useState<string | null>(null)
 
+  // Book/chapter/verse navigation state
   const [books, setBooks] = useState<SelectorBook[]>([])
   const [selectedBook, setSelectedBook] = useState<string | null>(null)
   const [chapters, setChapters] = useState<SelectorChapter[]>([])
@@ -77,7 +99,7 @@ function App() {
   const [verseRangeSelections, setVerseRangeSelections] = useState<Map<string, [number, number][]>>(new Map())
   const [, setForceLiveDragUpdate] = useState(0)
 
-  // Derived selection state - expanded from range selections for display
+  // Derived selection state — expanded from range selections for display
   const selectedVerses = useMemo(() => {
     const keys = new Set<string>()
     for (const [key, ranges] of verseRangeSelections) {
@@ -95,20 +117,17 @@ function App() {
     return keys
   }, [verseRangeSelections])
 
-  // Drag state refs
+  // Drag state refs (avoid re-renders during drag)
   const isMouseDownRef = useRef(false)
   const lastSelectedIndexRef = useRef<number | null>(null)
   const verseMouseDownRef = useRef<number | null>(null)
   const firstMouseEnterRef = useRef(true)
-  const selectedVerseMouseDownRef = useRef<number | null>(null)
-
-  // Click-drag selection refs (avoid re-render during drag)
   const selectionDragRef = useRef(false)
   const selectionMouseDownRef = useRef<{ bookAbbreviation: string; chapterId: number; verseId: number } | null>(null)
   const selectionSnapshotRef = useRef<string[]>([])
   const selectionTempRef = useRef<Map<string, [number, number][]>>(new Map())
 
-  // Existing refs
+  // Refs to keep latest values for callbacks
   const booksRef = useRef<SelectorBook[]>([])
   const selectedBookRef = useRef<string | null>(null)
   const selectedChapterRef = useRef<number | null>(null)
@@ -142,6 +161,7 @@ function App() {
     }
   }, [selectedBibleId, library])
 
+  // File loading handler
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
@@ -175,11 +195,12 @@ function App() {
     setLoading(false)
   }
 
+  // Search handler — supports verse reference, book name, and text search
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     if (!query.trim()) return
 
-    // Try to parse as verse/chapter reference first (bypasses mode)
+    // Try to parse as verse/chapter reference first
     const ref = parseReference(query)
     if (ref && selectedBibleId) {
       const structure = library.getSelectorBible(selectedBibleId)
@@ -191,7 +212,7 @@ function App() {
           setSelectedChapter(ref.chapter)
           const newVerses = library.getVersesForChapter(selectedBibleId, ref.book, ref.chapter)
           setVerses(newVerses)
-          
+
           // Add the specific verse to selection
           const bookChapKey = `${ref.book}|${ref.chapter}`
           setVerseRangeSelections(prev => {
@@ -200,14 +221,14 @@ function App() {
             next.set(bookChapKey, addVerseRange(existing, ref.verse))
             return next
           })
-          
+
           setHighlightedVerse({ book: ref.book, chapter: ref.chapter, verse: ref.verse })
         }
       }
       return
     }
 
-    // Try to find as a standalone book name (bypasses mode)
+    // Try to find as a standalone book name
     const bookName = findBookByName(query)
     if (bookName && selectedBibleId) {
       const structure = library.getSelectorBible(selectedBibleId)
@@ -252,7 +273,7 @@ function App() {
       const sortedResults = Array.from(flattened.values()).sort((a: any, b: any) => b.score - a.score)
       setResults(sortedResults)
 
-      // Auto-select matching verses (search can add non-consecutive verses)
+      // Auto-select matching verses
       for (const m of sortedResults) {
         const bookChapKey = `${m.bookAbbreviation}|${m.chapterId}`
         setVerseRangeSelections(prev => {
@@ -266,6 +287,7 @@ function App() {
     }
   }, [query, mode, library, selectedBibleId])
 
+  // Navigate to a specific verse
   const navigateToVerse = useCallback((bookAbbr: string, chapterId: number, verseId: number) => {
     if (!selectedBibleId) return
     const structure = library.getSelectorBible(selectedBibleId)
@@ -284,10 +306,11 @@ function App() {
     const newVerses = library.getVersesForChapter(selectedBibleId, bookAbbr, chapterId)
     setVerses(newVerses)
 
-    // Just highlight - don't modify selection (it preserves context)
+    // Just highlight — don't modify selection (preserves context)
     setHighlightedVerse({ book: bookAbbr, chapter: chapterId, verse: verseId })
   }, [selectedBibleId, library])
 
+  // Book/chapter/verse selection handlers
   const handleBookSelect = useCallback((abbr: string) => {
     setSelectedBook(prev => {
       const newBook = prev === abbr ? null : abbr
@@ -322,14 +345,11 @@ function App() {
     })
   }, [selectedBook, selectedBibleId, library])
 
-
-
   const handleResultsClick = useCallback((match: any) => {
     const bookAbbr = match.bookAbbreviation
     if (!bookAbbr) return
     const chapterId = match.chapterId
     const verseId = match.verseId
-
     navigateToVerse(bookAbbr, chapterId, verseId)
   }, [navigateToVerse])
 
@@ -337,6 +357,7 @@ function App() {
     setSelectedBibleId(bibleId)
   }, [])
 
+  // Demo data loader
   const handleLoadDemo = async () => {
     setLoading(true)
     setError('')
@@ -358,6 +379,7 @@ function App() {
     setLoading(false)
   }
 
+  // Global mouse handlers for drag selection
   const handleGlobalMouseUp = useCallback(() => {
     if (selectionDragRef.current && selectionMouseDownRef.current) {
       setVerseRangeSelections(collapseRangesForMap(selectionTempRef.current))
@@ -375,7 +397,8 @@ function App() {
     isMouseDownRef.current = true
   }, [])
 
-  const totalSelectedVerseCount = selectedVerses.size
+  // Selection refs needed by VersesPane and ResultsPane
+  const selectedVerseMouseDownRef = useRef<number | null>(null)
 
   return (
     <div
@@ -383,587 +406,98 @@ function App() {
       onMouseUp={handleGlobalMouseUp}
       onMouseDown={handleContainerMouseDown}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Theomelios</h1>
-        <span style={{ color: '#666', fontSize: '0.85rem' }}>Bible Search Engine</span>
-        <div style={{ display: 'flex', background: '#e8e8e8', borderRadius: '6px', overflow: 'hidden', border: '1px solid #ccc' }}>
-          <button
-            onClick={() => setMode('select')}
-            style={{
-              padding: '0.4rem 1rem', border: 'none', cursor: 'pointer',
-              background: mode === 'select' ? '#0066cc' : 'transparent',
-              color: mode === 'select' ? 'white' : '#333',
-              fontWeight: mode === 'select' ? 'bold' : 'normal',
-              fontSize: '0.85rem',
-            }}
-          >
-            Select
-          </button>
-          <button
-            onClick={() => setMode('search')}
-            style={{
-              padding: '0.4rem 1rem', border: 'none', cursor: 'pointer',
-              background: mode === 'search' ? '#0066cc' : 'transparent',
-              color: mode === 'search' ? 'white' : '#333',
-              fontWeight: mode === 'search' ? 'bold' : 'normal',
-              fontSize: '0.85rem',
-            }}
-          >
-            Search
-          </button>
-        </div>
-      </div>
+      {/* Header with mode toggle */}
+      <Header mode={mode} setMode={setMode} />
 
-      <div style={{ marginBottom: '0.5rem', padding: '0.75rem', background: '#f5f5f5', borderRadius: '6px', fontSize: '0.85rem' }}>
-        <strong>Loaded:</strong> {bibleCount} bibles, {docCount.toLocaleString()} indexed verses
-      </div>
+      {/* Status info */}
+      <StatusInfo bibleCount={bibleCount} docCount={docCount} />
 
-      <div style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <input
-          type="file"
-          multiple
-          accept=".vpc.json,.json,.zip"
-          onChange={handleFileSelect}
-          style={{ fontSize: '0.85rem' }}
-        />
-        <button onClick={handleLoadDemo} disabled={loading} style={{ padding: '0.4rem 0.75rem', background: '#444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>
-          Load Demo
-        </button>
-        {bibleNames.length > 0 && (
-          <select
-            value={selectedBibleId || ''}
-            onChange={e => handleBibleSelect(e.target.value)}
-            style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid #ddd', fontSize: '0.85rem' }}
-          >
-            {bibleNames.map(b => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        )}
-      </div>
+      {/* File upload and bible selection */}
+      <FileUploader
+        loading={loading}
+        error={error}
+        bibleNames={bibleNames}
+        selectedBibleId={selectedBibleId}
+        onLoadFile={handleFileSelect}
+        onLoadDemo={handleLoadDemo}
+        onSelectBible={handleBibleSelect}
+      />
 
-      {error && <p style={{ color: 'red', margin: '0.5rem 0', fontSize: '0.85rem' }}>{error}</p>}
+      {/* Search bar */}
+      <SearchBar
+        query={query}
+        setQuery={setQuery}
+        onSubmit={handleSearch}
+        loading={loading}
+        mode={mode}
+      />
 
-      <form onSubmit={handleSearch} style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-        <input
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder={mode === 'select' ? 'e.g. "john 3:16" or "1 john 2:1"' : 'Search for a word...'}
-          style={{ flex: 1, padding: '0.5rem', fontSize: '0.95rem', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
-        />
-        <button type="submit" disabled={loading} style={{ padding: '0.5rem 1rem', fontSize: '0.95rem', background: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-          {mode === 'select' ? 'Go' : loading ? 'Searching...' : 'Search'}
-        </button>
-      </form>
+      {/* Selection summary */}
+      <SelectionSummary
+        count={selectedVerses.size}
+        onClear={() => { setVerseRangeSelections(new Map()); setHighlightedVerse(null); }}
+      />
 
-      {mode === 'select' && totalSelectedVerseCount > 0 && (
-        <div style={{ marginBottom: '0.5rem', padding: '0.4rem 0.75rem', background: '#e8f0fe', borderRadius: '4px', fontSize: '0.8rem', color: '#333', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <strong>{totalSelectedVerseCount} verse{totalSelectedVerseCount > 1 ? 's' : ''} selected</strong>
-          <button onClick={() => { setVerseRangeSelections(new Map()); setHighlightedVerse(null); }} style={{ padding: '0.15rem 0.5rem', background: '#ccc', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '0.75rem' }}>
-            Clear
-          </button>
-        </div>
-      )}
+      {/* Results summary */}
+      <ResultsSummary
+        count={results.length}
+        query={query}
+        onClear={() => setResults([])}
+      />
 
-      {results.length > 0 && mode === 'search' && (
-        <div style={{ marginBottom: '0.5rem', padding: '0.5rem', background: '#f0f7ff', borderRadius: '4px', fontSize: '0.85rem' }}>
-          <strong>Search Results:</strong> {results.length} matches for "{query}"
-          <button onClick={() => setResults([])} style={{ marginLeft: '0.75rem', padding: '0.15rem 0.5rem', background: '#ccc', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '0.75rem' }}>
-            Clear
-          </button>
-        </div>
-      )}
-
+      {/* Main content: book/chapter/verse panes + results */}
       <div style={{ flex: 1, display: 'flex', gap: '8px', minHeight: 0, overflow: 'hidden' }}>
-        {/* Books Pane */}
-        <div style={{ flex: '0 0 220px', display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
-          <div style={{ padding: '0.5rem', background: '#f0f0f0', borderBottom: '1px solid #ddd', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Books
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0.35rem' }}>
-            {books.length > 0 ? bookCategories.map(category => {
-              const visibleBooks = category.books.filter(abbr => books.some(b => b.abbreviation === abbr))
-              if (visibleBooks.length === 0) return null
-              return (
-                <div key={category.id} style={{ marginBottom: '0.35rem' }}>
-                  <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: category.color, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px', paddingLeft: '1px' }}>
-                    {category.name}
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px' }}>
-                    {visibleBooks.map(abbr => {
-                      const book = books.find(b => b.abbreviation === abbr)
-                      const isSelected = selectedBook === abbr
-                      const cat = bookCategoryMap[abbr]
-                      return (
-                        <div
-                          key={abbr}
-                          onClick={() => handleBookSelect(abbr)}
-                          onMouseDown={handleContainerMouseDown}
-                          title={book?.name || abbr}
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            fontSize: '0.55rem',
-                            fontWeight: 'bold',
-                            fontFamily: 'monospace',
-                            borderRadius: '2px',
-                            background: isSelected
-                              ? cat?.color || '#0066cc'
-                              : (cat?.color || '#999') + 'cc',
-                            color: isSelected ? 'white' : 'white',
-                            border: isSelected ? `2px solid ${cat?.color || '#0066cc'}` : `2px solid ${cat?.color || '#999'}`,
-                            transition: 'transform 0.08s',
-                            transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                          }}
-                        >
-                          {abbr}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            }) : (
-              <div style={{ padding: '0.5rem', fontSize: '0.75rem', color: '#999', textAlign: 'center' }}>
-                {selectedBibleId ? 'No books' : 'No Bible loaded'}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Books pane */}
+        <BooksPane
+          books={books}
+          selectedBook={selectedBook}
+          onBookSelect={handleBookSelect}
+          onContainerMouseDown={handleContainerMouseDown}
+        />
 
-        {/* Chapters Pane */}
-        <div style={{ flex: '0 0 165px', display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
-          <div style={{ padding: '0.5rem', background: '#f0f0f0', borderBottom: '1px solid #ddd', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Chapters
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0.35rem', userSelect: 'none' }}>
-            {chapters.length > 0 ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
-                {chapters.map((chapter) => {
-                  const isSelected = selectedChapter === chapter.id
-                  return (
-                    <div
-                      key={chapter.id}
-                      onClick={() => handleChapterSelect(chapter.id)}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      title={`Chapter ${chapter.id}`}
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
-                        fontFamily: 'monospace',
-                        borderRadius: '2px',
-                        background: isSelected ? '#0066cc' : '#555',
-                        color: isSelected ? 'white' : 'white',
-                        border: isSelected ? '2px solid #004499' : '2px solid #333',
-                        transition: 'transform 0.08s',
-                        transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                      }}
-                    >
-                      {chapter.id}
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div style={{ padding: '0.5rem', fontSize: '0.75rem', color: '#999', textAlign: 'center' }}>
-                {selectedBook ? 'No chapters' : 'Select a book'}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Chapters pane */}
+        <ChaptersPane
+          chapters={chapters}
+          selectedChapter={selectedChapter}
+          selectedBook={selectedBook}
+          onChapterSelect={handleChapterSelect}
+        />
 
-        {/* Verses Pane - now shows verse text previews with stacked selection */}
-        <div style={{ flex: '0 0 300px', display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
-          <div style={{ padding: '0.5rem', background: '#f0f0f0', borderBottom: '1px solid #ddd', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Verses
-            {selectedBook && selectedChapter && (
-              <span style={{ fontWeight: 'normal', textTransform: 'none', marginLeft: '0.5rem', color: '#666' }}>
-                {books.find(b => b.abbreviation === selectedBook)?.name || ''} {selectedChapter}
-              </span>
-            )}
-          </div>
-          <div
-            style={{ flex: 1, overflowY: 'auto', padding: '0.25rem', userSelect: 'none' }}
-            onMouseDown={(e) => {
-              e.stopPropagation()
-              const target = e.target as HTMLElement
-              const verseDiv = target.closest('[data-verse-index]')
-              if (verseDiv) {
-                e.preventDefault()
-                const idx = parseInt(verseDiv.getAttribute('data-verse-index') || '-1', 10)
-                if (idx >= 0 && idx < verses.length) {
-                  isMouseDownRef.current = true
-                  selectionDragRef.current = true
-                  selectionMouseDownRef.current = {
-                    bookAbbreviation: verses[idx].bookAbbreviation,
-                    chapterId: verses[idx].chapterId,
-                    verseId: verses[idx].id,
-                  }
-                  selectionSnapshotRef.current = verses.map(v => `${v.bookAbbreviation}|${v.chapterId}|${v.id}`)
-                  selectionTempRef.current = new Map(verseRangeSelections)
-                  const bookChapKey = `${verses[idx].bookAbbreviation}|${verses[idx].chapterId}`
-                  const key = `${verses[idx].bookAbbreviation}|${verses[idx].chapterId}|${verses[idx].id}`
-                  if (!selectedVerses.has(key)) {
-                    selectionTempRef.current.delete(bookChapKey)
-                    setForceLiveDragUpdate(prev => prev + 1)
-                  }
-                }
-              }
-            }}
-            onMouseMove={(e) => {
-              if (!selectionDragRef.current || !selectionMouseDownRef.current) return
-              e.stopPropagation()
-              const target = document.elementFromPoint(e.clientX, e.clientY)
-              if (!target) return
-              const verseDiv = target.closest('[data-verse-index]')
-              if (!verseDiv) return
-              const idx = parseInt(verseDiv.getAttribute('data-verse-index') || '-1', 10)
-              if (idx < 0 || idx >= verses.length) return
-              
-              const startKey = `${selectionMouseDownRef.current.bookAbbreviation}|${selectionMouseDownRef.current.chapterId}|${selectionMouseDownRef.current.verseId}`
-              const startSnapIdx = selectionSnapshotRef.current.indexOf(startKey)
-              const currentKey = `${verses[idx].bookAbbreviation}|${verses[idx].chapterId}|${verses[idx].id}`
-              const currentSnapIdx = selectionSnapshotRef.current.indexOf(currentKey)
-              if (startSnapIdx < 0 || currentSnapIdx < 0) return
-              
-              const firstIdx = Math.min(startSnapIdx, currentSnapIdx)
-              const lastIdx = Math.max(startSnapIdx, currentSnapIdx)
-              const bookChapKey = `${verses[idx].bookAbbreviation}|${verses[idx].chapterId}`
-              const minVerse = Math.min(...verses.slice(firstIdx, lastIdx + 1).map(v => v.id))
-              const maxVerse = Math.max(...verses.slice(firstIdx, lastIdx + 1).map(v => v.id))
-              
-              selectionTempRef.current = new Map(selectionTempRef.current)
-              const existing = selectionTempRef.current.get(bookChapKey) || []
-              selectionTempRef.current.set(bookChapKey, collapseRanges([...existing, [minVerse, maxVerse]]))
-              setForceLiveDragUpdate(prev => prev + 1)
-            }}
-          >
-            {verses.map((verse, index) => {
-              const key = `${verse.bookAbbreviation}|${verse.chapterId}|${verse.id}`
-              let isSelected = selectedVerses.has(key)
-              if (selectionDragRef.current) {
-                const ranges = selectionTempRef.current.get(`${verse.bookAbbreviation}|${verse.chapterId}`)
-                if (ranges) {
-                  isSelected = false
-                  for (const [start, end] of ranges) {
-                    if (verse.id >= start && verse.id <= end) {
-                      isSelected = true
-                      break
-                    }
-                  }
-                }
-              }
-              const isHighlighted = highlightedVerse?.book === verse.bookAbbreviation &&
-                highlightedVerse?.chapter === verse.chapterId &&
-                highlightedVerse?.verse === verse.id
-              
-              // Get verse text preview (truncated)
-              const textPreview = truncateText(verse.text, 80)
-              
-              return (
-                <div
-                  key={key}
-                  data-verse-index={index}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (selectionDragRef.current) return
-                    const bookChapKey = `${verse.bookAbbreviation}|${verse.chapterId}`
-                    
-                    if (isSelected) {
-                      // Toggle off: try to remove this verse from the ranges
-                      setVerseRangeSelections(prev => {
-                        const next = new Map(prev)
-                        const existing = next.get(bookChapKey) || []
-                        if (existing.length === 0) return next
-                        
-                        // Check if this verse is a standalone single-verse range
-                        const singleIdx = existing.findIndex(([s, e]) => s === verse.id && e === verse.id)
-                        if (singleIdx >= 0) {
-                          const filtered = existing.filter(([, e], i) => i !== singleIdx || !(e === verse.id))
-                          if (filtered.length === 0) {
-                            next.delete(bookChapKey)
-                          } else {
-                            next.set(bookChapKey, filtered)
-                          }
-                          return next
-                        }
-                        
-                        // Check if verse is in a multi-verse range
-                        const rangeIdx = existing.findIndex(([s, e]) => s <= verse.id && verse.id <= e)
-                        if (rangeIdx >= 0) {
-                          const [start, end] = existing[rangeIdx]
-                          const otherRanges = existing.filter((_, i) => i !== rangeIdx)
-                          
-                          if (start === verse.id && end === verse.id) {
-                            // Single verse in range - remove it
-                            if (otherRanges.length === 0) {
-                              next.delete(bookChapKey)
-                            } else {
-                              next.set(bookChapKey, otherRanges)
-                            }
-                          } else if (start === verse.id) {
-                            // First verse - shrink range
-                            otherRanges.push([verse.id + 1, end])
-                            next.set(bookChapKey, collapseRanges(otherRanges))
-                          } else if (end === verse.id) {
-                            // Last verse - shrink range
-                            otherRanges.push([start, verse.id - 1])
-                            next.set(bookChapKey, collapseRanges(otherRanges))
-                          } else {
-                            // Middle of range - split into two ranges
-                            otherRanges.push([start, verse.id - 1])
-                            otherRanges.push([verse.id + 1, end])
-                            next.set(bookChapKey, collapseRanges(otherRanges))
-                          }
-                        }
-                        
-                        return next
-                      })
-                    } else {
-                      // Toggle on: add to range
-                      setVerseRangeSelections(prev => {
-                        const next = new Map(prev)
-                        const existing = next.get(bookChapKey) || []
-                        next.set(bookChapKey, addVerseRange(existing, verse.id))
-                        return next
-                      })
-                    }
-                    
-                    setHighlightedVerse({ book: verse.bookAbbreviation, chapter: verse.chapterId, verse: verse.id })
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    padding: '3px 5px',
-                    marginBottom: '1px',
-                    cursor: 'pointer',
-                    fontSize: '0.78rem',
-                    background: isSelected ? '#0066cc' : isHighlighted ? '#d0e0ff' : '#fafafa',
-                    color: isSelected ? 'white' : isHighlighted ? '#333' : '#333',
-                    borderRadius: '3px',
-                    border: `1px solid ${isSelected ? '#0055aa' : isHighlighted ? '#a0c0ee' : '#eee'}`,
-                    transition: 'background 0.08s',
-                    lineHeight: 1.3,
-                  }}
-                >
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '22px',
-                    height: '20px',
-                    padding: '0 4px',
-                    marginRight: '5px',
-                    marginTop: '1px',
-                    fontSize: '0.7rem',
-                    fontFamily: 'monospace',
-                    fontWeight: 'bold',
-                    background: isSelected ? 'rgba(255,255,255,0.2)' : '#e8e8e8',
-                    color: isSelected ? 'white' : '#666',
-                    borderRadius: '3px',
-                    flexShrink: 0,
-                  }}>
-                    {verse.id}
-                  </span>
-                  <span style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    color: isSelected ? 'rgba(255,255,255,0.9)' : '#888',
-                  }}>
-                    {textPreview}
-                  </span>
-                </div>
-              )
-            })}
-            {verses.length === 0 && (
-              <div style={{ padding: '0.5rem', fontSize: '0.75rem', color: '#999', textAlign: 'center', width: '100%' }}>
-                {selectedChapter ? 'No verses' : 'Select a chapter'}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Verses pane */}
+        <VersesPane
+          verses={verses}
+          selectedVerses={selectedVerses}
+          highlightedVerse={highlightedVerse}
+          books={books}
+          selectedBook={selectedBook}
+          selectedChapter={selectedChapter}
+          selectionDragRef={selectionDragRef}
+          selectionMouseDownRef={selectionMouseDownRef}
+          selectionSnapshotRef={selectionSnapshotRef}
+          selectionTempRef={selectionTempRef}
+          setVerseRangeSelections={setVerseRangeSelections}
+          setForceLiveDragUpdate={setForceLiveDragUpdate}
+          setHighlightedVerse={setHighlightedVerse}
+        />
 
-        {/* Results Pane */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
-          <div style={{ padding: '0.5rem', background: '#f0f0f0', borderBottom: '1px solid #ddd', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {mode === 'select' ? 'Selected Verses' : 'Search Results'}
-            {mode === 'select' && totalSelectedVerseCount > 0 && (
-              <span style={{ fontWeight: 'normal', textTransform: 'none', marginLeft: '0.5rem', color: '#666' }}>
-                ({totalSelectedVerseCount})
-              </span>
-            )}
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0.25rem' }}>
-            {mode === 'select' ? (
-              totalSelectedVerseCount > 0 ? (
-                Array.from(selectedVerses).sort((a, b) => {
-                  const partsA = a.split('|')
-                  const partsB = b.split('|')
-                  if (partsA[0] !== partsB[0]) return partsA[0].localeCompare(partsB[0])
-                  if (parseInt(partsA[1]) !== parseInt(partsB[1])) return parseInt(partsA[1]) - parseInt(partsB[1])
-                  return parseInt(partsA[2]) - parseInt(partsB[2])
-                }).map((key, _idx) => {
-                  const parts = key.split('|')
-                  const bookAbbr = parts[0]
-                  const chapterId = parseInt(parts[1], 10)
-                  const verseId = parseInt(parts[2], 10)
-                  const book = books.find(b => b.abbreviation === bookAbbr)
-                  const verse = library.findVerseByRef(selectedBibleId || '', bookAbbr, chapterId, verseId, books)
-                  const isHighlighted = highlightedVerse?.book === bookAbbr &&
-                    highlightedVerse?.chapter === chapterId &&
-                    highlightedVerse?.verse === verseId
-                  return (
-                  <div
-                    key={key}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (selectionDragRef.current) return
-                      navigateToVerse(bookAbbr, chapterId, verseId)
-                    }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation()
-                      if (selectionMouseDownRef.current) return
-                      isMouseDownRef.current = true
-                      selectionDragRef.current = true
-                      selectionMouseDownRef.current = { bookAbbreviation: bookAbbr, chapterId, verseId }
-                      const snapKey = `${bookAbbr}|${chapterId}|${verseId}`
-                      const currentSelected = Array.from(selectedVerses)
-                      const selIdx = currentSelected.indexOf(snapKey)
-                      if (selIdx >= 0) {
-                        selectionSnapshotRef.current = currentSelected
-                      } else {
-                        selectionSnapshotRef.current = [snapKey, ...currentSelected]
-                      }
-                      selectionTempRef.current = new Map(verseRangeSelections)
-                    }}
-                    onMouseEnter={(e) => {
-                      e.stopPropagation()
-                      if (!selectionDragRef.current || !selectionMouseDownRef.current) return
-                      const snapKey = `${bookAbbr}|${chapterId}|${verseId}`
-                      const snapIdx = selectionSnapshotRef.current.indexOf(snapKey)
-                      if (snapIdx < 0) return
-                      const startKey = `${selectionMouseDownRef.current.bookAbbreviation}|${selectionMouseDownRef.current.chapterId}|${selectionMouseDownRef.current.verseId}`
-                      const startIdx = selectionSnapshotRef.current.indexOf(startKey)
-                      if (startIdx < 0) return
-                      const first = Math.min(startIdx, snapIdx)
-                      const last = Math.max(startIdx, snapIdx)
-                      for (let i = first; i <= last; i++) {
-                        const k = selectionSnapshotRef.current[i]
-                        if (k) {
-                          const parts = k.split('|')
-                          const bk = `${parts[0]}|${parts[1]}`
-                          const vid = parseInt(parts[2], 10)
-                          selectionTempRef.current = new Map(selectionTempRef.current)
-                          const existing = selectionTempRef.current.get(bk) || []
-                          selectionTempRef.current.set(bk, collapseRanges([...existing, [vid, vid]]))
-                        }
-                      }
-                    }}
-                    style={{
-                        padding: '0.4rem', marginBottom: '2px', borderRadius: '3px',
-                        background: isHighlighted ? '#e0ecff' : '#f9f9f9',
-                        borderLeft: isHighlighted ? '3px solid #0066cc' : '3px solid #ddd',
-                        cursor: 'pointer', fontSize: '0.78rem', lineHeight: 1.4,
-                      }}
-                    >
-                      <strong>{book?.name || bookAbbr} {chapterId}:{verseId}</strong>
-                      {verse?.text && <div style={{ marginLeft: '0.5rem', color: '#555' }}>{truncateText(verse.text, 150)}</div>}
-                    </div>
-                  )
-                })
-              ) : (
-                <div style={{ padding: '1rem', fontSize: '0.85rem', color: '#999', textAlign: 'center' }}>
-                  Select verses using the verse pane or type a reference (e.g., "john 3:16")
-                </div>
-              )
-            ) : (
-              results.length > 0 ? (
-                results.map((m: any, j: number) => (
-                  <div
-                    key={j}
-                    onClick={() => {
-                      if (selectionDragRef.current) return
-                      handleResultsClick(m)
-                    }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation()
-                      if (selectionMouseDownRef.current) return
-                      isMouseDownRef.current = true
-                      selectionDragRef.current = true
-                      selectionMouseDownRef.current = { bookAbbreviation: m.bookAbbreviation, chapterId: m.chapterId, verseId: m.verseId }
-                      const snapKey = `${m.bookAbbreviation}|${m.chapterId}|${m.verseId}`
-                      const currentSelected = Array.from(selectedVerses)
-                      const selIdx = currentSelected.indexOf(snapKey)
-                      if (selIdx >= 0) {
-                        selectionSnapshotRef.current = currentSelected
-                      } else {
-                        selectionSnapshotRef.current = [snapKey, ...currentSelected]
-                      }
-                      selectionTempRef.current = new Map(verseRangeSelections)
-                    }}
-                    onMouseEnter={(e) => {
-                      e.stopPropagation()
-                      if (!selectionDragRef.current || !selectionMouseDownRef.current) return
-                      const snapKey = `${m.bookAbbreviation}|${m.chapterId}|${m.verseId}`
-                      const snapIdx = selectionSnapshotRef.current.indexOf(snapKey)
-                      if (snapIdx < 0) return
-                      const startKey = `${selectionMouseDownRef.current.bookAbbreviation}|${selectionMouseDownRef.current.chapterId}|${selectionMouseDownRef.current.verseId}`
-                      const startIdx = selectionSnapshotRef.current.indexOf(startKey)
-                      if (startIdx < 0) return
-                      const first = Math.min(startIdx, snapIdx)
-                      const last = Math.max(startIdx, snapIdx)
-                      for (let i = first; i <= last; i++) {
-                        const k = selectionSnapshotRef.current[i]
-                        if (k) {
-                          const parts = k.split('|')
-                          const bk = `${parts[0]}|${parts[1]}`
-                          const vid = parseInt(parts[2], 10)
-                          selectionTempRef.current = new Map(selectionTempRef.current)
-                          const existing = selectionTempRef.current.get(bk) || []
-                          selectionTempRef.current.set(bk, collapseRanges([...existing, [vid, vid]]))
-                        }
-                      }
-                    }}
-                    style={{
-                      padding: '0.5rem', marginBottom: '2px', background: '#f9f9f9', borderRadius: '4px',
-                      borderLeft: `4px solid ${m.matchingTerms?.length > 1 ? '#0066cc' : '#999'}`,
-                      cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1.4,
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                      <strong>{m.bibleName}</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#666' }}>
-                        {m.bookName} {m.chapterId}:{m.verseId}
-                      </span>
-                    </div>
-                    <p style={{ margin: '0', color: '#333' }}>{m.text}</p>
-                    {m.matchingTerms && m.matchingTerms.length > 0 && (
-                      <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '0.25rem' }}>
-                        terms: [{m.matchingTerms.join(', ')}]
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div style={{ padding: '1rem', fontSize: '0.85rem', color: '#999', textAlign: 'center' }}>
-                  No results
-                </div>
-              )
-            )}
-          </div>
-        </div>
+        {/* Results pane */}
+        <ResultsPane
+          mode={mode}
+          selectedVerses={selectedVerses}
+          results={results}
+          books={books}
+          highlightedVerse={highlightedVerse}
+          _verseRangeSelections={verseRangeSelections}
+          selectionDragRef={selectionDragRef}
+          selectionMouseDownRef={selectionMouseDownRef}
+          selectionSnapshotRef={selectionSnapshotRef}
+          selectionTempRef={selectionTempRef}
+          onNavigate={navigateToVerse}
+          onResultsClick={handleResultsClick}
+          onContainerMouseDown={handleContainerMouseDown}
+          setVerseRangeSelections={setVerseRangeSelections}
+          setForceLiveDragUpdate={setForceLiveDragUpdate}
+        />
       </div>
     </div>
   )

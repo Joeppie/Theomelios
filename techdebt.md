@@ -48,32 +48,32 @@ Theomelios has clean engine-level separation but several structural issues in th
 
 ## P2 — Architectural Improvements
 
-### 6. Split App.tsx (986 lines) into composable components
+### ~~6. Split App.tsx (986 lines) into composable components~~ ✅ Resolved
 
-Violates AGENTS.MD: "keep components small and composable" and "avoid redundancy."
+App.tsx has been split into 8 focused components:
 
-**Proposed components:**
+| Component | File | Lines | Responsibility |
+|-----------|------|-------|----------------|
+| `Header` | `src/components/Header.tsx` | ~40 | Title and search/selection mode toggle |
+| `StatusInfo` | `src/components/StatusInfo.tsx` | ~10 | Loaded bible/verse count display |
+| `FileUploader` | `src/components/FileUploader.tsx` | ~40 | File input, demo button, bible selector dropdown |
+| `SearchBar` | `src/components/SearchBar.tsx` | ~20 | Search query input and submit |
+| `SelectionSummary` | `src/components/SelectionSummary.tsx` | ~15 | Selected verse count with clear button |
+| `ResultsSummary` | `src/components/ResultsSummary.tsx` | ~15 | Search result count with clear button |
+| `BooksPane` | `src/components/BooksPane.tsx` | ~80 | Book buttons grouped by category |
+| `ChaptersPane` | `src/components/ChaptersPane.tsx` | ~55 | Chapter buttons for selected book |
+| `VersesPane` | `src/components/VersesPane.tsx` | ~250 | Verse list with click/drag selection |
+| `ResultsPane` | `src/components/ResultsPane.tsx` | ~180 | Selected verses or search results display |
+| `App` | `src/components/App.tsx` | ~270 | State management, wiring, layout |
 
-| Component | Responsibility |
-|-----------|---------------|
-| `SearchBar` | Query input, mode toggle, search form |
-| `FileUploader` | File input, loading state, demo button |
-| `BibleSelector` | Bible dropdown, loaded count display |
-| `BooksPane` | Book buttons grouped by category |
-| `ChaptersPane` | Chapter buttons |
-| `VersesPane` | Verse list with drag selection |
-| `ResultsPane` | Selected verses or search results |
-| `App` | Wiring, state management, layout |
-
-The `search` handler (lines 192-281) is 90 lines and handles three cases (reference, book name, text search) plus result flattening — it belongs in a custom hook (`useSearch`) or in the engine itself.
+Each component has JSDoc documentation, uses typed props, and focuses on a single responsibility. App.tsx is now responsible for state management and composes the UI components.
 
 ### 7. Move search logic to engine or custom hook
 
-The search handler duplicates logic that the engine could provide:
-- Reference parsing → already in `constants/books.ts`
-- Book lookup → already in `BibleLibrary`
-- Bible fetching → already in `BibleLibrary`
-- Result flattening → not in engine
+The `handleSearch` callback in App.tsx (lines ~170-260) still handles three cases:
+- Verse/chapter reference parsing → uses `parseReference()` from `constants/books.ts`
+- Book name lookup → uses `findBookByName()` from `constants/books.ts`
+- Text search → calls `library.search()` and flattens results
 
 **Option A (engine):** Add `BibleLibrary.searchByReference(bibleId, book, chapter, verse)` that navigates to a verse and returns it.
 **Option B (hook):** Extract `useSearch` hook that encapsulates the reference-parsing → navigation flow.
@@ -82,8 +82,7 @@ The search handler duplicates logic that the engine could provide:
 
 | Issue | Location |
 |-------|----------|
-| Duplicate stop words: `'all'` and `'on'` | `src/engine/search.ts:5,12` — appears twice in `STOP_WORDS` |
-| Demo loader fetches nonexistent path | `src/components/App.tsx:358` — `./data/bible.json` does not exist in repo |
+| Demo loader fetches nonexistent path | `src/components/App.tsx:341` — `./data/bible.json` does not exist in repo |
 
 ---
 
