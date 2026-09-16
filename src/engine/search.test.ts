@@ -177,4 +177,52 @@ describe('SearchIndex', () => {
       expect(library.getBibleCount()).toBe(countBefore - 1)
     })
   })
+
+  describe('BibleLibrary getVersesForChapter - engine level', () => {
+    beforeAll(async () => {
+      const kJV = await loadTestBible('English King James Version.vpc.json')
+      library.loadBible(kJV)
+    })
+
+    it('returns verses with correct book name for Genesis chapter 1', () => {
+      const verses = library.getVersesForChapter('English King James Version', 'Gn', 1)
+      expect(verses.length).toBeGreaterThan(0)
+      expect(verses[0].bookName).toBe('Genesis')
+      expect(verses[0].bookAbbreviation).toBe('Gn')
+      expect(verses[0].chapterId).toBe(1)
+    })
+
+    it('returns verses with correct book name for a New Testament book', () => {
+      const verses = library.getVersesForChapter('English King James Version', 'Jn', 3)
+      expect(verses.length).toBeGreaterThan(0)
+      expect(verses[0].bookName).toBe('John')
+      expect(verses[0].bookAbbreviation).toBe('Jn')
+    })
+
+    it('returns empty array for non-existent book', () => {
+      const verses = library.getVersesForChapter('English King James Version', 'NonExistent', 1)
+      expect(verses).toEqual([])
+    })
+
+    it('returns empty array for non-existent chapter', () => {
+      const verses = library.getVersesForChapter('English King James Version', 'Gn', 999)
+      expect(verses).toEqual([])
+    })
+
+    it('returns verses with correct verse IDs in order', () => {
+      const verses = library.getVersesForChapter('English King James Version', 'Gn', 1)
+      for (let i = 0; i < verses.length; i++) {
+        expect(verses[i].id).toBe(i + 1)
+        expect(verses[i].chapterVerseId).toBe(i + 1)
+      }
+    })
+
+    it('verse text is populated for Genesis 1:1', () => {
+      const verses = library.getVersesForChapter('English King James Version', 'Gn', 1)
+      const firstVerse = verses.find(v => v.id === 1)
+      expect(firstVerse).not.toBeNull()
+      expect(firstVerse!.text.length).toBeGreaterThan(0)
+      expect(firstVerse!.text).toContain('In the beginning')
+    })
+  })
 })

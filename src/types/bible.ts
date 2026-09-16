@@ -104,14 +104,3 @@ export interface ChapterRangeSelection {
   chapter: number
   ranges: VerseRange[]
 }
-
-export interface SelectorState {
-  mode: 'select' | 'search'
-  selectedBook: string | null
-  selectedChapter: number | null
-  selectedVerses: Set<string>
-  verseRangeSelections: ChapterRangeSelection[]
-  chapterRangeSelections: ChapterRangeSelection[]
-  highlightedVerse: { book: string; chapter: number; verse: number } | null
-  bibleId: string | null
-}

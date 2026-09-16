@@ -30,11 +30,6 @@ export const bookNameMap: Record<string, string> = {
   '3Jn': '3 John', 'Ju': 'Jude', 'Re': 'Revelation',
 }
 
-export const bookAbbrReverse: Record<string, string> = {}
-for (const [abbr, name] of Object.entries(bookNameMap)) {
-  bookAbbrReverse[name.toLowerCase()] = abbr
-}
-
 export const bookAlternatives: Record<string, string[]> = {
   'Gn': ['genesis', 'gen', 'gene', 'gn'],
   'Ex': ['exodus', 'exo', 'exod'],

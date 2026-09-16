@@ -121,12 +121,11 @@ export class BibleLibrary {
           const ch = b.chapters.find(c => c.id === chapterId)
           if (ch) {
             for (const v of ch.verses) {
-              const book = bible.testaments.flatMap(t => t.books).find(bk => bk.abbreviation === bookAbbr)
               verses.push({
                 id: v.id,
                 text: v.text,
                 bookAbbreviation: bookAbbr,
-                bookName: book?.name || bookAbbr,
+                bookName: b.name,
                 chapterId,
                 chapterVerseId: v.id,
                 isSelected: false,

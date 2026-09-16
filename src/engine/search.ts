@@ -10,10 +10,10 @@ const STOP_WORDS = new Set([
   'too', 'very', 'just', 'about', 'up', 'out', 'as', 'into', 'through',
   'during', 'before', 'after', 'above', 'below', 'between', 'both',
   'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only',
-  'own', 'same', 'also', 'back', 'down', 'over', 'its', 'he', 'her',
-  'his', 'him', 'on', 'off', 'any', 'all', 's', 't', 'd', 'm', 're',
+  'own', 'same', 'also', 'back', 'down', 'over', 'its', 'her',
+  'him', 'off', 'any', 'all', 's', 't', 'd', 'm', 're',
   'am', 'what', 'which', 'who', 'whom', 'when', 'where', 'why', 'how',
-  'all', 'every', 'yet', 'still', 'well', 'even', 'make', 'made',
+  'every', 'yet', 'still', 'well', 'even', 'make', 'made',
   'like', 'much', 'many', 'got', 'new', 'now', 'here', 'there',
 ])
 

@@ -10,30 +10,19 @@ Theomelios has clean engine-level separation but several structural issues in th
 
 ## P0 — Quick Wins (Dead Code & Bugs)
 
-### 1. Remove unused code
+- ~~**1. Remove unused code**~~ ✅ Resolved — removed `bookAbbrReverse` from `src/constants/books.ts`, removed `SelectorState` from `src/types/bible.ts`
+  - ~~`bookAbbrReverse`~~ `src/constants/books.ts:33` — removed (was never used)
+  - ~~`SelectorState`~~ `src/types/bible.ts:108` — removed (never imported anywhere)
+  - ~~`bookCategoryMap` import in App~~ — NOT dead (used at line 511 for styling, kept)
+  - ~~`bookNameToAbbr` import in App~~ — NOT dead (used at line 252 for search results, kept)
+  - ~~`setForceLiveDragUpdate`~~ — NOT dead (used as re-render trigger at lines 633, 663, kept)
+  - ~~Dead ESLint disable comment~~ — NOT dead (corresponding state is live, kept)
 
-| Code | Location |
-|------|----------|
-| `bookAbbrReverse` | `src/constants/books.ts:33` — built but never used |
-| `SelectorState` type | `src/types/bible.ts:108` — defined but never referenced |
-| `bookCategoryMap` import in App | `src/components/App.tsx:6` — only used once line 511, could be computed locally |
-| `bookNameToAbbr` import in App | `src/components/App.tsx:6` — only used once line 252, could be computed locally |
-| `setForceLiveDragUpdate` state | `src/components/App.tsx:90` — state setter never called |
-| Dead ESLint disable comment | `src/components/App.tsx:89` — unnecessary once dead code is removed |
+- ~~**2. Fix bug in `getVersesForChapter`**~~ ✅ Resolved — `src/engine/BibleLibrary.ts` line 124: removed redundant `bible.testaments.flatMap(...).find(...)` book lookup inside the verse loop. Now reuses `b` from the outer loop (line 119).
 
-### 2. Fix bug in `getVersesForChapter`
+- ~~**Remove duplicate stop words**~~ ✅ Resolved — `src/engine/search.ts`: removed duplicates `he` (appeared twice), `on` (appeared twice), `all` (appeared twice) from `STOP_WORDS` Set.
 
-`src/engine/BibleLibrary.ts:124` — the book name lookup inside the verse loop re-scans `bible.testaments.flatMap(...)` when the book was already found in the outer loop at line 120. Store `book` from the outer loop and reuse it.
-
-```typescript
-// Before (line 124):
-const book = bible.testaments.flatMap(t => t.books).find(bk => bk.abbreviation === bookAbbr)
-
-// After:
-const book = b // from outer loop at line 119
-```
-
-**Impact**: Reduces unnecessary iteration on every verse in a chapter.
+- ~~**Add unit test for `getVersesForChapter`**~~ ✅ Resolved — added 8 new tests in `src/engine/search.test.ts` under `BibleLibrary getVersesForChapter - engine level` describe block. Tests verify book name correctness, empty arrays for non-existent book/chapter, verse ID ordering, and verse text content.
 
 ---
 
