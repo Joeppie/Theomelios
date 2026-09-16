@@ -41,6 +41,14 @@ function collapseRanges(ranges: [number, number][]): [number, number][] {
   return result
 }
 
+function collapseRangesForMap(selections: Map<string, [number, number][]>): Map<string, [number, number][]> {
+  const next = new Map(selections)
+  for (const [key, ranges] of next) {
+    next.set(key, collapseRanges(ranges))
+  }
+  return next
+}
+
 function verseRangesToKeySet(ranges: [number, number][], book: string, chapter: number): Set<string> {
   const keys = new Set<string>()
   for (const [start, end] of ranges) {
@@ -78,6 +86,8 @@ function App() {
 
   // Range-based selection state (source of truth)
   const [verseRangeSelections, setVerseRangeSelections] = useState<Map<string, [number, number][]>>(new Map())
+  // eslint-disable-next-line no-unused-vars
+  const [, setForceLiveDragUpdate] = useState(0)
 
   // Drag state refs
   const isMouseDownRef = useRef(false)
@@ -85,6 +95,12 @@ function App() {
   const verseMouseDownRef = useRef<number | null>(null)
   const firstMouseEnterRef = useRef(true)
   const selectedVerseMouseDownRef = useRef<number | null>(null)
+
+  // Click-drag selection refs (avoid re-render during drag)
+  const selectionDragRef = useRef(false)
+  const selectionMouseDownRef = useRef<{ bookAbbreviation: string; chapterId: number; verseId: number } | null>(null)
+  const selectionSnapshotRef = useRef<string[]>([])
+  const selectionTempRef = useRef<Map<string, [number, number][]>>(new Map())
 
   // Existing refs
   const booksRef = useRef<SelectorBook[]>([])
@@ -264,28 +280,6 @@ function App() {
     }
   }, [query, mode, library, selectedBibleId])
 
-  const goToReference = useCallback((ref: { book: string; chapter: number; verse: number }) => {
-    if (!selectedBibleId) return
-    const structure = library.getSelectorBible(selectedBibleId)
-    if (!structure) return
-
-    const bookIdx = structure.books.findIndex(b => b.abbreviation === ref.book)
-    if (bookIdx < 0) return
-
-    setSelectedBook(ref.book)
-    setChapters(structure.books[bookIdx].chapters.map(c => ({ ...c, isSelected: false, isHighlighted: false })))
-    setSelectedChapter(ref.chapter)
-    verseMouseDownRef.current = null
-    lastSelectedIndexRef.current = null
-    firstMouseEnterRef.current = true
-
-    const newVerses = library.getVersesForChapter(selectedBibleId, ref.book, ref.chapter)
-    setVerses(newVerses)
-
-    // Highlight the verse but DON'T clear/add to selection - just show current location
-    setHighlightedVerse({ book: ref.book, chapter: ref.chapter, verse: ref.verse })
-  }, [selectedBibleId, library])
-
   const navigateToVerse = useCallback((bookAbbr: string, chapterId: number, verseId: number) => {
     if (!selectedBibleId) return
     const structure = library.getSelectorBible(selectedBibleId)
@@ -379,7 +373,12 @@ function App() {
   }
 
   const handleGlobalMouseUp = useCallback(() => {
+    if (selectionDragRef.current && selectionMouseDownRef.current) {
+      setVerseRangeSelections(collapseRangesForMap(selectionTempRef.current))
+    }
     isMouseDownRef.current = false
+    selectionDragRef.current = false
+    selectionMouseDownRef.current = null
     lastSelectedIndexRef.current = null
     verseMouseDownRef.current = null
     selectedVerseMouseDownRef.current = null
@@ -396,6 +395,7 @@ function App() {
     <div
       style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem', fontFamily: 'system-ui, sans-serif', height: '100vh', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}
       onMouseUp={handleGlobalMouseUp}
+      onMouseDown={handleContainerMouseDown}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Theomelios</h1>
@@ -610,50 +610,74 @@ function App() {
           <div
             style={{ flex: 1, overflowY: 'auto', padding: '0.25rem', userSelect: 'none' }}
             onMouseDown={(e) => {
-              isMouseDownRef.current = true
+              e.stopPropagation()
               const target = e.target as HTMLElement
               const verseDiv = target.closest('[data-verse-index]')
               if (verseDiv) {
+                e.preventDefault()
                 const idx = parseInt(verseDiv.getAttribute('data-verse-index') || '-1', 10)
                 if (idx >= 0 && idx < verses.length) {
-                  verseMouseDownRef.current = idx
-                  lastSelectedIndexRef.current = idx
-                  firstMouseEnterRef.current = true
+                  isMouseDownRef.current = true
+                  selectionDragRef.current = true
+                  selectionMouseDownRef.current = {
+                    bookAbbreviation: verses[idx].bookAbbreviation,
+                    chapterId: verses[idx].chapterId,
+                    verseId: verses[idx].id,
+                  }
+                  selectionSnapshotRef.current = verses.map(v => `${v.bookAbbreviation}|${v.chapterId}|${v.id}`)
+                  selectionTempRef.current = new Map(verseRangeSelections)
+                  const bookChapKey = `${verses[idx].bookAbbreviation}|${verses[idx].chapterId}`
+                  const key = `${verses[idx].bookAbbreviation}|${verses[idx].chapterId}|${verses[idx].id}`
+                  if (!selectedVerses.has(key)) {
+                    selectionTempRef.current.delete(bookChapKey)
+                    setForceLiveDragUpdate(prev => prev + 1)
+                  }
                 }
               }
             }}
             onMouseMove={(e) => {
-              if (!isMouseDownRef.current || lastSelectedIndexRef.current === null || verseMouseDownRef.current === null) return
+              if (!selectionDragRef.current || !selectionMouseDownRef.current) return
+              e.stopPropagation()
               const target = document.elementFromPoint(e.clientX, e.clientY)
               if (!target) return
               const verseDiv = target.closest('[data-verse-index]')
               if (!verseDiv) return
               const idx = parseInt(verseDiv.getAttribute('data-verse-index') || '-1', 10)
               if (idx < 0 || idx >= verses.length) return
-              if (idx === lastSelectedIndexRef.current) return
               
-              const currentVerses = versesRef.current
-              const firstIdx = verseMouseDownRef.current
-              const start = Math.min(firstIdx, idx)
-              const end = Math.max(firstIdx, idx)
+              const startKey = `${selectionMouseDownRef.current.bookAbbreviation}|${selectionMouseDownRef.current.chapterId}|${selectionMouseDownRef.current.verseId}`
+              const startSnapIdx = selectionSnapshotRef.current.indexOf(startKey)
+              const currentKey = `${verses[idx].bookAbbreviation}|${verses[idx].chapterId}|${verses[idx].id}`
+              const currentSnapIdx = selectionSnapshotRef.current.indexOf(currentKey)
+              if (startSnapIdx < 0 || currentSnapIdx < 0) return
               
-              setVerseRangeSelections(prev => {
-                const next = new Map(prev)
-                if (currentVerses[start] && currentVerses[end]) {
-                  const bookChapKey = `${currentVerses[start].bookAbbreviation}|${currentVerses[start].chapterId}`
-                  const existing = next.get(bookChapKey) || []
-                  const minVerse = Math.min(...currentVerses.slice(start, end + 1).map(v => v.id))
-                  const maxVerse = Math.max(...currentVerses.slice(start, end + 1).map(v => v.id))
-                  next.set(bookChapKey, collapseRanges([...existing, [minVerse, maxVerse]]))
-                }
-                return next
-              })
-              lastSelectedIndexRef.current = idx
+              const firstIdx = Math.min(startSnapIdx, currentSnapIdx)
+              const lastIdx = Math.max(startSnapIdx, currentSnapIdx)
+              const bookChapKey = `${verses[idx].bookAbbreviation}|${verses[idx].chapterId}`
+              const minVerse = Math.min(...verses.slice(firstIdx, lastIdx + 1).map(v => v.id))
+              const maxVerse = Math.max(...verses.slice(firstIdx, lastIdx + 1).map(v => v.id))
+              
+              selectionTempRef.current = new Map(selectionTempRef.current)
+              const existing = selectionTempRef.current.get(bookChapKey) || []
+              selectionTempRef.current.set(bookChapKey, collapseRanges([...existing, [minVerse, maxVerse]]))
+              setForceLiveDragUpdate(prev => prev + 1)
             }}
           >
             {verses.map((verse, index) => {
               const key = `${verse.bookAbbreviation}|${verse.chapterId}|${verse.id}`
-              const isSelected = selectedVerses.has(key)
+              let isSelected = selectedVerses.has(key)
+              if (selectionDragRef.current) {
+                const ranges = selectionTempRef.current.get(`${verse.bookAbbreviation}|${verse.chapterId}`)
+                if (ranges) {
+                  isSelected = false
+                  for (const [start, end] of ranges) {
+                    if (verse.id >= start && verse.id <= end) {
+                      isSelected = true
+                      break
+                    }
+                  }
+                }
+              }
               const isHighlighted = highlightedVerse?.book === verse.bookAbbreviation &&
                 highlightedVerse?.chapter === verse.chapterId &&
                 highlightedVerse?.verse === verse.id
@@ -667,6 +691,7 @@ function App() {
                   data-verse-index={index}
                   onClick={(e) => {
                     e.stopPropagation()
+                    if (selectionDragRef.current) return
                     const bookChapKey = `${verse.bookAbbreviation}|${verse.chapterId}`
                     
                     if (isSelected) {
@@ -803,7 +828,7 @@ function App() {
                   if (partsA[0] !== partsB[0]) return partsA[0].localeCompare(partsB[0])
                   if (parseInt(partsA[1]) !== parseInt(partsB[1])) return parseInt(partsA[1]) - parseInt(partsB[1])
                   return parseInt(partsA[2]) - parseInt(partsB[2])
-                }).map((key, idx) => {
+                }).map((key, _idx) => {
                   const parts = key.split('|')
                   const bookAbbr = parts[0]
                   const chapterId = parseInt(parts[1], 10)
@@ -814,23 +839,53 @@ function App() {
                     highlightedVerse?.chapter === chapterId &&
                     highlightedVerse?.verse === verseId
                   return (
-                    <div
-                      key={key}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigateToVerse(bookAbbr, chapterId, verseId)
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation()
-                        selectedVerseMouseDownRef.current = idx
-                      }}
-                      onMouseEnter={(e) => {
-                        e.stopPropagation()
-                        if (isMouseDownRef.current) {
-                          navigateToVerse(bookAbbr, chapterId, verseId)
+                  <div
+                    key={key}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (selectionDragRef.current) return
+                      navigateToVerse(bookAbbr, chapterId, verseId)
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                      if (selectionMouseDownRef.current) return
+                      isMouseDownRef.current = true
+                      selectionDragRef.current = true
+                      selectionMouseDownRef.current = { bookAbbreviation: bookAbbr, chapterId, verseId }
+                      const snapKey = `${bookAbbr}|${chapterId}|${verseId}`
+                      const currentSelected = Array.from(selectedVerses)
+                      const selIdx = currentSelected.indexOf(snapKey)
+                      if (selIdx >= 0) {
+                        selectionSnapshotRef.current = currentSelected
+                      } else {
+                        selectionSnapshotRef.current = [snapKey, ...currentSelected]
+                      }
+                      selectionTempRef.current = new Map(verseRangeSelections)
+                    }}
+                    onMouseEnter={(e) => {
+                      e.stopPropagation()
+                      if (!selectionDragRef.current || !selectionMouseDownRef.current) return
+                      const snapKey = `${bookAbbr}|${chapterId}|${verseId}`
+                      const snapIdx = selectionSnapshotRef.current.indexOf(snapKey)
+                      if (snapIdx < 0) return
+                      const startKey = `${selectionMouseDownRef.current.bookAbbreviation}|${selectionMouseDownRef.current.chapterId}|${selectionMouseDownRef.current.verseId}`
+                      const startIdx = selectionSnapshotRef.current.indexOf(startKey)
+                      if (startIdx < 0) return
+                      const first = Math.min(startIdx, snapIdx)
+                      const last = Math.max(startIdx, snapIdx)
+                      for (let i = first; i <= last; i++) {
+                        const k = selectionSnapshotRef.current[i]
+                        if (k) {
+                          const parts = k.split('|')
+                          const bk = `${parts[0]}|${parts[1]}`
+                          const vid = parseInt(parts[2], 10)
+                          selectionTempRef.current = new Map(selectionTempRef.current)
+                          const existing = selectionTempRef.current.get(bk) || []
+                          selectionTempRef.current.set(bk, collapseRanges([...existing, [vid, vid]]))
                         }
-                      }}
-                      style={{
+                      }
+                    }}
+                    style={{
                         padding: '0.4rem', marginBottom: '2px', borderRadius: '3px',
                         background: isHighlighted ? '#e0ecff' : '#f9f9f9',
                         borderLeft: isHighlighted ? '3px solid #0066cc' : '3px solid #ddd',
@@ -852,7 +907,49 @@ function App() {
                 results.map((m: any, j: number) => (
                   <div
                     key={j}
-                    onClick={() => handleResultsClick(m)}
+                    onClick={() => {
+                      if (selectionDragRef.current) return
+                      handleResultsClick(m)
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                      if (selectionMouseDownRef.current) return
+                      isMouseDownRef.current = true
+                      selectionDragRef.current = true
+                      selectionMouseDownRef.current = { bookAbbreviation: m.bookAbbreviation, chapterId: m.chapterId, verseId: m.verseId }
+                      const snapKey = `${m.bookAbbreviation}|${m.chapterId}|${m.verseId}`
+                      const currentSelected = Array.from(selectedVerses)
+                      const selIdx = currentSelected.indexOf(snapKey)
+                      if (selIdx >= 0) {
+                        selectionSnapshotRef.current = currentSelected
+                      } else {
+                        selectionSnapshotRef.current = [snapKey, ...currentSelected]
+                      }
+                      selectionTempRef.current = new Map(verseRangeSelections)
+                    }}
+                    onMouseEnter={(e) => {
+                      e.stopPropagation()
+                      if (!selectionDragRef.current || !selectionMouseDownRef.current) return
+                      const snapKey = `${m.bookAbbreviation}|${m.chapterId}|${m.verseId}`
+                      const snapIdx = selectionSnapshotRef.current.indexOf(snapKey)
+                      if (snapIdx < 0) return
+                      const startKey = `${selectionMouseDownRef.current.bookAbbreviation}|${selectionMouseDownRef.current.chapterId}|${selectionMouseDownRef.current.verseId}`
+                      const startIdx = selectionSnapshotRef.current.indexOf(startKey)
+                      if (startIdx < 0) return
+                      const first = Math.min(startIdx, snapIdx)
+                      const last = Math.max(startIdx, snapIdx)
+                      for (let i = first; i <= last; i++) {
+                        const k = selectionSnapshotRef.current[i]
+                        if (k) {
+                          const parts = k.split('|')
+                          const bk = `${parts[0]}|${parts[1]}`
+                          const vid = parseInt(parts[2], 10)
+                          selectionTempRef.current = new Map(selectionTempRef.current)
+                          const existing = selectionTempRef.current.get(bk) || []
+                          selectionTempRef.current.set(bk, collapseRanges([...existing, [vid, vid]]))
+                        }
+                      }
+                    }}
                     style={{
                       padding: '0.5rem', marginBottom: '2px', background: '#f9f9f9', borderRadius: '4px',
                       borderLeft: `4px solid ${m.matchingTerms?.length > 1 ? '#0066cc' : '#999'}`,
