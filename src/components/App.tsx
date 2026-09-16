@@ -475,6 +475,7 @@ function App() {
           selectionMouseDownRef={selectionMouseDownRef}
           selectionSnapshotRef={selectionSnapshotRef}
           selectionTempRef={selectionTempRef}
+          verseRangeSelections={verseRangeSelections}
           setVerseRangeSelections={setVerseRangeSelections}
           setForceLiveDragUpdate={setForceLiveDragUpdate}
           setHighlightedVerse={setHighlightedVerse}

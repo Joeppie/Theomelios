@@ -22,6 +22,7 @@ export function VersesPane({
   selectionMouseDownRef,
   selectionSnapshotRef,
   selectionTempRef,
+  verseRangeSelections,
   setVerseRangeSelections,
   setForceLiveDragUpdate,
   setHighlightedVerse,
@@ -36,6 +37,7 @@ export function VersesPane({
   selectionMouseDownRef: React.MutableRefObject<DragMouseDownState | null>
   selectionSnapshotRef: React.MutableRefObject<string[]>
   selectionTempRef: React.MutableRefObject<Map<string, [number, number][]>>
+  verseRangeSelections: Map<string, [number, number][]>
   setVerseRangeSelections: (fn: (prev: Map<string, [number, number][]>) => Map<string, [number, number][]>) => void
   setForceLiveDragUpdate: (fn: (prev: number) => number) => void
   setHighlightedVerse: (v: { book: string; chapter: number; verse: number } | null) => void
@@ -145,14 +147,28 @@ export function VersesPane({
     setHighlightedVerse({ book: verse.bookAbbreviation, chapter: verse.chapterId, verse: verse.id })
   }
 
-  // Handle verse mousedown
-  const handleVerseMouseDown = (verse: SelectorVerse, _idx: number) => {
+  // Handle verse mousedown (start drag selection)
+  const handleContainerMouseDown = (idx: number) => {
     return (e: React.MouseEvent) => {
-      e.stopPropagation()
       e.preventDefault()
-      const key = `${verse.bookAbbreviation}|${verse.chapterId}|${verse.id}`
-      if (!selectedVerses.has(key)) {
-        selectionTempRef.current.delete(`${verse.bookAbbreviation}|${verse.chapterId}`)
+      e.stopPropagation()
+      const verse = verses[idx]
+      const bookChapKey = `${verse.bookAbbreviation}|${verse.chapterId}`
+      const verseKey = `${verse.bookAbbreviation}|${verse.chapterId}|${verse.id}`
+      
+      // Set up drag state
+      selectionDragRef.current = true
+      selectionMouseDownRef.current = {
+        bookAbbreviation: verse.bookAbbreviation,
+        chapterId: verse.chapterId,
+        verseId: verse.id,
+      }
+      selectionSnapshotRef.current = verses.map(v => `${v.bookAbbreviation}|${v.chapterId}|${v.id}`)
+      selectionTempRef.current = new Map(verseRangeSelections)
+      
+      // If the verse is NOT selected, remove it from temp selection and trigger update
+      if (!selectedVerses.has(verseKey)) {
+        selectionTempRef.current.delete(bookChapKey)
         setForceLiveDragUpdate(prev => prev + 1)
       }
     }
@@ -217,10 +233,8 @@ export function VersesPane({
           const target = e.target as HTMLElement
           const verseDiv = target.closest('[data-verse-index]')
           if (verseDiv) {
-            handleVerseMouseDown(
-              verses[parseInt(verseDiv.getAttribute('data-verse-index') || '-1', 10)],
-              parseInt(verseDiv.getAttribute('data-verse-index') || '-1', 10)
-            )(e as any)
+            const idx = parseInt(verseDiv.getAttribute('data-verse-index') || '-1', 10)
+            handleContainerMouseDown(idx)(e)
           }
         }}
         onMouseMove={handleContainerMouseMove}
