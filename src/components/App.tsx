@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { BibleLibrary } from '../engine/BibleLibrary'
 import { parseVpcJson } from '../engine/vpcParser'
 import { convertVpcToUniform } from '../engine/bibleConverter'
 import { loadBibleFromZipFile } from '../engine/zipLoader'
 import { parseReference, findBookByPattern, bookNameToAbbr, findBookByName, bookCategories, bookCategoryMap } from '../constants/books'
-import type { SelectorBook, SelectorChapter, SelectorVerse } from '../types/bible'
+import type { SelectorBook, SelectorChapter, SelectorVerse } from '../types/ui'
 
 // Range helpers for verse selections
 function addVerseRange(ranges: [number, number][], verseId: number): [number, number][] {
@@ -49,16 +49,6 @@ function collapseRangesForMap(selections: Map<string, [number, number][]>): Map<
   return next
 }
 
-function verseRangesToKeySet(ranges: [number, number][], book: string, chapter: number): Set<string> {
-  const keys = new Set<string>()
-  for (const [start, end] of ranges) {
-    for (let i = start; i <= end; i++) {
-      keys.add(`${book}|${chapter}|${i}`)
-    }
-  }
-  return keys
-}
-
 function truncateText(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text
   return text.substring(0, maxLen) + '\u2026'
@@ -81,13 +71,29 @@ function App() {
   const [chapters, setChapters] = useState<SelectorChapter[]>([])
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
   const [verses, setVerses] = useState<SelectorVerse[]>([])
-  const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set())
   const [highlightedVerse, setHighlightedVerse] = useState<{ book: string; chapter: number; verse: number } | null>(null)
 
   // Range-based selection state (source of truth)
   const [verseRangeSelections, setVerseRangeSelections] = useState<Map<string, [number, number][]>>(new Map())
-  // eslint-disable-next-line no-unused-vars
   const [, setForceLiveDragUpdate] = useState(0)
+
+  // Derived selection state - expanded from range selections for display
+  const selectedVerses = useMemo(() => {
+    const keys = new Set<string>()
+    for (const [key, ranges] of verseRangeSelections) {
+      const parts = key.split('|')
+      if (parts.length === 2) {
+        const book = parts[0]
+        const chapter = parseInt(parts[1], 10)
+        for (const [start, end] of ranges) {
+          for (let i = start; i <= end; i++) {
+            keys.add(`${book}|${chapter}|${i}`)
+          }
+        }
+      }
+    }
+    return keys
+  }, [verseRangeSelections])
 
   // Drag state refs
   const isMouseDownRef = useRef(false)
@@ -108,7 +114,6 @@ function App() {
   const selectedChapterRef = useRef<number | null>(null)
   const selectedBibleIdRef = useRef<string | null>(null)
   const versesRef = useRef<SelectorVerse[]>([])
-  const selectedVersesRef = useRef<Set<string>>(new Set())
   const modeRef = useRef<'select' | 'search'>('select')
   const resultsRef = useRef<any[]>([])
   const verseRangeSelectionsRef = useRef<Map<string, [number, number][]>>(new Map())
@@ -118,28 +123,9 @@ function App() {
   useEffect(() => { selectedChapterRef.current = selectedChapter }, [selectedChapter])
   useEffect(() => { selectedBibleIdRef.current = selectedBibleId }, [selectedBibleId])
   useEffect(() => { versesRef.current = verses }, [verses])
-  useEffect(() => { selectedVersesRef.current = selectedVerses }, [selectedVerses])
   useEffect(() => { modeRef.current = mode }, [mode])
   useEffect(() => { resultsRef.current = results }, [results])
   useEffect(() => { verseRangeSelectionsRef.current = verseRangeSelections }, [verseRangeSelections])
-
-  // Compute selectedVerses from range selections (for display)
-  useEffect(() => {
-    const computed = new Set<string>()
-    
-    // From verse ranges - keys are formatted as "book|chapter"
-    for (const [key, ranges] of verseRangeSelections) {
-      const parts = key.split('|')
-      if (parts.length === 2) {
-        const book = parts[0]
-        const chapter = parseInt(parts[1], 10)
-        const verseKeys = verseRangesToKeySet(ranges, book, chapter)
-        for (const vk of verseKeys) computed.add(vk)
-      }
-    }
-    
-    setSelectedVerses(computed)
-  }, [verseRangeSelections, selectedBibleId, library])
 
   // Populate books when bible is loaded or selected
   useEffect(() => {

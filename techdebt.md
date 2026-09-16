@@ -28,56 +28,21 @@ Theomelios has clean engine-level separation but several structural issues in th
 
 ## P1 — Structural Improvements
 
-### 3. Move UI types out of domain layer
+- ~~**3. Move UI types out of domain layer**~~ ✅ Resolved — created `src/types/ui.ts` with `SelectorBook`, `SelectorChapter`, `SelectorVerse`, `VerseRange`, `ChapterRangeSelection`. All imports updated: `BibleLibrary.ts`, `App.tsx`, `bibleIntegration.test.ts`.
 
-`src/types/bible.ts` currently contains both domain types and UI types mixed together:
+- ~~**4. Add indexes to BibleLibrary**~~ ✅ Resolved:
+  - `getSelectorBible` now returns cached result built during `loadBible()` (O(1) after first call)
+  - `verseLookup` Map: `bibleId|bookAbbr|chapterId|verseId` → `{text, bookName}` for O(1) verse text lookup
+  - `getVersesForChapter` now uses early-return pattern instead of iterating all testaments/books per verse
+  - `unloadBible` clears both caches (`selectorCache`, `verseLookup`)
 
-**Domain types (stay):**
-`VerseEntry`, `ChapterData`, `BookData`, `TestamentData`, `BibleMetadata`, `BibleData`, `SearchResult`, `SearchDocument`, `VerseKey`
-
-**UI types (move to `src/components/types.ts` or inline in App):**
-`SelectorBook`, `SelectorChapter`, `SelectorVerse`, `ChapterRangeSelection`, `SelectorState`, `VerseRange`
-
-These types are only consumed by the React component layer and don't belong in the shared domain model. This breaks the coupling where the engine returns UI-specific structures.
-
-### 4. Add indexes to BibleLibrary
-
-`BibleLibrary` performs linear scans where O(1) lookups are possible:
-
-| Method | Current | Fix |
-|--------|---------|-----|
-| `getSelectorBible` | Rebuilds entire books tree on call | Build once on `loadBible()`, cache and return |
-| `findVerseByRef` | Traverses all testaments/books/chapters | Build a `Map<key, VerseEntry>` during indexing |
-| `getVersesForChapter` | Traverses all testaments/books | O(1) lookup via keyed index |
-| `findBookIndex` | Linear `findIndex` on books array | O(1) map: `Map<abbr, index>` |
-
-Implement a lightweight in-memory index keyed by `bibleId|testamentId|bookId|chapterId|verseId` for O(1) verse lookup by reference.
-
-### 5. Consolidate selection state
-
-`App.tsx` maintains two representations of the same selection state:
-
-- `selectedVerses` — `Set<string>` of `"book|chapter|verse"` keys (line 84)
-- `verseRangeSelections` — `Map<"book|chapter", [start, end][]>` (line 88)
-
-A `useEffect` (line 127) bridges them by expanding ranges into keys. This is two sources of truth.
-
-**Recommended approach**: Keep `verseRangeSelections` as the source of truth (it supports the drag selection model) and derive `selectedVerses` via a `useMemo`. Remove the `useEffect` bridge and the `selectedVerses` state:
-
-```typescript
-const selectedVerses = useMemo(() => {
-  const keys = new Set<string>()
-  for (const [key, ranges] of verseRangeSelections) {
-    const [book, chapter] = key.split('|')
-    for (const [start, end] of ranges) {
-      for (let v = start; v <= end; v++) {
-        keys.add(`${book}|${chapter}|${v}`)
-      }
-    }
-  }
-  return keys
-}, [verseRangeSelections])
-```
+- ~~**5. Consolidate selection state**~~ ✅ Resolved:
+  - Removed `selectedVerses` state (`useState<Set<string>>`)
+  - Replaced with `selectedVerses` derived via `useMemo` from `verseRangeSelections`
+  - Removed bridging `useEffect` (lines 127-142 in original)
+  - Removed `selectedVersesRef` (no longer needed)
+  - Removed unused `verseRangesToKeySet` helper (now only used by useMemo)
+  - **Single source of truth**: `verseRangeSelections` (Map of ranges) → `selectedVerses` (derived Set of keys)
 
 ---
 

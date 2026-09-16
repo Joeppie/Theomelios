@@ -224,5 +224,41 @@ describe('SearchIndex', () => {
       expect(firstVerse!.text.length).toBeGreaterThan(0)
       expect(firstVerse!.text).toContain('In the beginning')
     })
+
+    it('selector cache is built on load', () => {
+      const result = library.getSelectorBible('English King James Version')
+      expect(result).not.toBeNull()
+      expect(result!.books.length).toBe(66)
+    })
+
+    it('selector cache returns same structure on repeated calls', () => {
+      const result1 = library.getSelectorBible('English King James Version')
+      const result2 = library.getSelectorBible('English King James Version')
+      expect(result1!.books.length).toBe(result2!.books.length)
+      for (let i = 0; i < result1!.books.length; i++) {
+        expect(result1!.books[i].abbreviation).toBe(result2!.books[i].abbreviation)
+      }
+    })
+
+    it('unloadBible clears selector cache', async () => {
+      const niv = await loadTestBible('English New International Version.vpc.json')
+      library.loadBible(niv)
+      const id = 'English New International Version'
+      const cached = library.getSelectorBible(id)
+      expect(cached).not.toBeNull()
+      library.unloadBible(id)
+      const cleared = library.getSelectorBible(id)
+      expect(cleared).toBeNull()
+    })
+
+    it('getVersesForChapter uses indexed lookup', () => {
+      const verses = library.getVersesForChapter('English King James Version', 'Jn', 3)
+      expect(verses.length).toBeGreaterThan(0)
+      for (const verse of verses) {
+        expect(verse.bookName).toBe('John')
+        expect(verse.bookAbbreviation).toBe('Jn')
+        expect(verse.chapterId).toBe(3)
+      }
+    })
   })
 })

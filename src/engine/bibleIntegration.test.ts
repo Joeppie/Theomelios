@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { BibleLibrary } from '../engine/BibleLibrary'
 import { loadTestBible } from '../engine/testUtils'
 import { bookOrder } from '../constants/books'
-import type { SelectorBook } from '../types/bible'
+import type { SelectorBook } from '../types/ui'
 
 describe('KJV integration test', () => {
   let library: BibleLibrary
