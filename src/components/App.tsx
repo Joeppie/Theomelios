@@ -487,6 +487,7 @@ function App() {
           selectedVerses={selectedVerses}
           results={results}
           books={books}
+          verses={verses}
           highlightedVerse={highlightedVerse}
           _verseRangeSelections={verseRangeSelections}
           selectionDragRef={selectionDragRef}

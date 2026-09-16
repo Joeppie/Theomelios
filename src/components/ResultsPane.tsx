@@ -1,4 +1,4 @@
-import type { SelectorBook } from '../types/ui'
+import type { SelectorBook, SelectorVerse } from '../types/ui'
 
 /**
  * ResultsPane — displays either selected verses (select mode) or search results (search mode).
@@ -9,6 +9,7 @@ export function ResultsPane({
   selectedVerses,
   results,
   books,
+  verses,
   highlightedVerse,
   _verseRangeSelections,
   selectionDragRef,
@@ -25,6 +26,7 @@ export function ResultsPane({
   selectedVerses: Set<string>
   results: any[]
   books: SelectorBook[]
+  verses: SelectorVerse[]
   highlightedVerse: { book: string; chapter: number; verse: number } | null
   _verseRangeSelections: Map<string, [number, number][]>
   selectionDragRef: React.MutableRefObject<boolean>
@@ -125,6 +127,8 @@ export function ResultsPane({
               const isHighlighted = highlightedVerse?.book === bookAbbr &&
                 highlightedVerse?.chapter === chapterId &&
                 highlightedVerse?.verse === verseId
+              const verseObj = verses.find(v => v.bookAbbreviation === bookAbbr && v.chapterId === chapterId && v.id === verseId)
+              const verseText = verseObj?.text || ''
 
               return (
                 <div
@@ -148,6 +152,11 @@ export function ResultsPane({
                   }}
                 >
                   <strong>{book?.name || bookAbbr} {chapterId}:{verseId}</strong>
+                  {verseText && (
+                    <div style={{ marginTop: '0.25rem', color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {verseText}
+                    </div>
+                  )}
                 </div>
               )
             })
